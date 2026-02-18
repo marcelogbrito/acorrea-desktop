@@ -1,32 +1,36 @@
-import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
-
-// Definição da interface para o progresso
-interface ProgressoInbox {
-  atual: number;
-  total: number;
-}
+// preload.ts
+const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('acorreaAPI', {
-  // Adicionamos a tipagem explícita aqui
-  executarPyCad: (payload: any) => ipcRenderer.invoke('executar-pycad', payload),
-  abrirGinfes: (credentials: any) => ipcRenderer.invoke('executar-robo-ginfes', credentials),
-  encryptPassword: (password: string) => ipcRenderer.invoke('encrypt-password', password),
-  selecionarArquivo: (options: any) => ipcRenderer.invoke('selecionar-arquivo', options),
-  abrirArquivoLocal: (caminho: string) => ipcRenderer.invoke('abrir-arquivo-local', caminho),
-  // NOVO: Escutador de eventos para o Progresso do Inbox
-  // Escutador de progresso que o React vai usar
-  onInboxProgresso: (callback: (dados: ProgressoInbox) => void) => {
-    const subscription = (_event: IpcRendererEvent, value: ProgressoInbox) => callback(value);
-    
-    ipcRenderer.on('inbox-progresso', subscription);
+    executarPyCad: (payload: any) => ipcRenderer.invoke('executar-pycad', payload),
+    abrirGinfes: (credentials: any) => ipcRenderer.invoke('executar-robo-ginfes', credentials),
+    encryptPassword: (password: string) => ipcRenderer.invoke('encrypt-password', password),
+    selecionarArquivo: (options: any) => ipcRenderer.invoke('selecionar-arquivo', options),
+    abrirArquivoLocal: (caminho: string) => ipcRenderer.invoke('abrir-arquivo-local', caminho),
 
-    // Retorna uma função para remover o listener (cleanup)
-    return () => ipcRenderer.removeListener('inbox-progresso', subscription);
+    // Gatilho para o botão manual
+  sincronizarEmails: () => ipcRenderer.invoke('forcar-sincronizacao'),
+  onWhatsAppQR: (callback: (qr: string) => void) => {
+  const listener = (_event: any, qr: string) => callback(qr);
+  ipcRenderer.on('whatsapp-qr', listener);
+  return () => ipcRenderer.removeListener('whatsapp-qr', listener);
+},
+  
+  onInboxProgresso: (callback: any) => {
+    const listener = (_event: any, value: any) => callback(value);
+    ipcRenderer.on('inbox-progresso', listener);
+    return () => ipcRenderer.removeListener('inbox-progresso', listener);
   },
   
-  // Função para forçar uma atualização manual se quiser
-  sincronizarAgora: () => ipcRenderer.invoke('forcar-sincronizacao-inbox'),
-    
-  // Limpador de eventos (boa prática para evitar lentidão)
-  removeInboxListener: () => ipcRenderer.removeAllListeners('inbox-progresso')
-})
+  // Novo: Ouvinte para mensagens de log (ERRO ou SUCESSO)
+  onInboxLog: (callback: any) => {
+    const listener = (_event: any, msg: string) => callback(msg);
+    ipcRenderer.on('inbox-log', listener);
+    return () => ipcRenderer.removeListener('inbox-log', listener);
+  },
+  onRefreshInbox: (callback: () => void) => {
+  const listener = () => callback();
+  ipcRenderer.on('refresh-inbox', listener);
+  return () => ipcRenderer.removeListener('refresh-inbox', listener);
+},
+});

@@ -16,7 +16,7 @@ export default defineConfig({
             rollupOptions: {
               // Isso diz ao Vite: "Não tente empacotar o playwright, 
               // deixe que o Node o carregue direto da node_modules"
-              external: ['playwright', 'playwright-core'],
+              external: ['whatsapp-web.js', 'bufferutil', 'utf-8-validate','playwright', 'playwright-core'],
             },
           },
         },

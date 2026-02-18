@@ -6,15 +6,24 @@ import { exec } from 'node:child_process';
 import fs from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { processarEmails } from '../automation/email_worker';
+import { iniciarWhatsApp, enviarMensagemWhatsApp } from '../automation/whatsapp_worker';
 
 // Configuração de ambiente
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Variáveis do Supabase (Recomendado usar .env no futuro)
+// A chave ANON continua para o que for público
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+// A SERVICE ROLE garante que o backend acesse a tabela de credenciais
+const SERVICE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+
+
+if (!SERVICE_KEY) {
+  console.error("ERRO: SUPABASE_SERVICE_ROLE_KEY não encontrada no .env");
+}
+
+const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
 let win: BrowserWindow | null;
 
@@ -23,10 +32,11 @@ function createWindow() {
     width: 1200,
     height: 800,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
-      nodeIntegration: false,
-      contextIsolation: true,
-    },
+  // Verifique se o arquivo gerado na pasta dist-electron é realmente .mjs ou .js
+  preload: path.join(__dirname, 'preload.mjs'), 
+  nodeIntegration: false,
+  contextIsolation: true,
+},
   });
 
   if (process.env.VITE_DEV_SERVER_URL) win.loadURL(process.env.VITE_DEV_SERVER_URL);
@@ -47,36 +57,7 @@ ipcMain.handle('encrypt-password', async (_, password) => {
   return safeStorage.encryptString(password).toString('base64');
 });
 
-// ==========================================
-// 2. SINCRONIZAÇÃO DE INBOX (E-MAILS)
-// ==========================================
 
-async function sincronizarInbox() {
-  try {
-    const { data: creds } = await supabase
-      .from('credenciais_servicos')
-      .select('*')
-      .eq('servico', 'inbox_email')
-      .single();
-
-    if (creds && creds.senha_hash) {
-      const senhaReal = decryptPassword(creds.senha_hash);
-      
-      // Chamada para o worker com callback de progresso
-      await processarEmails(
-        { usuario: creds.usuario, senha_descriptografada: senhaReal },
-        SUPABASE_URL,
-        SUPABASE_KEY,
-        (atual, total) => {
-          // ENVIA PARA O FRONTEND
-          win?.webContents.send('inbox-progresso', { atual, total });
-        }
-      );
-    }
-  } catch (e) {
-    console.error("Erro na sincronização:", e);
-  }
-}
 
 // ==========================================
 // 3. AUTOMAÇÃO FINANCEIRA (GINFES)
@@ -182,12 +163,61 @@ ipcMain.handle('abrir-arquivo-local', async (_, caminho) => {
   shell.openPath(caminho);
 });
 
+// Handler para o botão manual
+ipcMain.handle('forcar-sincronizacao', async () => {
+  await sincronizarInbox();
+  return { success: true };
+});
+
+async function sincronizarInbox() {
+  try {
+    win?.webContents.send('inbox-log', 'Iniciando conexão com Locaweb...');
+    
+    const { data: creds } = await supabase
+      .from('credenciais_servicos')
+      .select('*')
+      .eq('servico', 'inbox_email')
+      .single();
+
+    if (!creds) {
+      win?.webContents.send('inbox-log', 'Erro: Credenciais não encontradas no Supabase.');
+      return;
+    }
+
+    const senhaReal = decryptPassword(creds.senha_hash);
+    
+    win?.webContents.send('inbox-log', 'Autenticando...');
+    
+    await processarEmails(
+      { usuario: creds.usuario, senha_descriptografada: senhaReal },
+      SUPABASE_URL,
+      SERVICE_KEY,
+      (atual, total) => {
+        win?.webContents.send('inbox-progresso', { atual, total });
+      }
+    );
+
+    win?.webContents.send('inbox-log', 'Sincronização finalizada com sucesso!');
+  } catch (e: any) {
+    win?.webContents.send('inbox-log', `Erro crítico: ${e.message}`);
+    console.error(e);
+  }
+}
+
+// Handler para enviar mensagem do Inbox
+ipcMain.handle('enviar-whatsapp', async (_, { telefone, mensagem }) => {
+  return await enviarMensagemWhatsApp(telefone, mensagem);
+});
+
 // ==========================================
 // INICIALIZAÇÃO DO APP
 // ==========================================
 
 app.whenReady().then(() => {
   createWindow();
+  // Inicia o WhatsApp Worker
+  // Usamos as chaves que você já tem no .env
+  iniciarWhatsApp(win, SUPABASE_URL, SERVICE_KEY);
   // Inicia sincronização após 1 minuto e repete a cada 10
   setTimeout(sincronizarInbox, 60000);
   setInterval(sincronizarInbox, 10 * 60 * 1000);

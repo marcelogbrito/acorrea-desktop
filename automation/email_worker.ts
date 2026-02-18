@@ -57,10 +57,10 @@ export async function processarEmails(
 
     let processados = 0;
     for (const item of messages) {
-      processados++;
-      
-      // Envia o progresso para o Main Process
-      if (onProgress) onProgress(processados, total);
+  processados++;
+  console.log(`Processando e-mail ${processados} de ${total}...`); // ADICIONE ISSO
+  
+  if (onProgress) onProgress(processados, total);
 
       const allPart = item.parts.find((part: any) => part.which === '');
       if (!allPart) continue;

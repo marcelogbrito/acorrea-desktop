@@ -1,21 +1,32 @@
 "use strict";
-const electron = require("electron");
-electron.contextBridge.exposeInMainWorld("acorreaAPI", {
-  // Adicionamos a tipagem explícita aqui
-  executarPyCad: (payload) => electron.ipcRenderer.invoke("executar-pycad", payload),
-  abrirGinfes: (credentials) => electron.ipcRenderer.invoke("executar-robo-ginfes", credentials),
-  encryptPassword: (password) => electron.ipcRenderer.invoke("encrypt-password", password),
-  selecionarArquivo: (options) => electron.ipcRenderer.invoke("selecionar-arquivo", options),
-  abrirArquivoLocal: (caminho) => electron.ipcRenderer.invoke("abrir-arquivo-local", caminho),
-  // NOVO: Escutador de eventos para o Progresso do Inbox
-  // Escutador de progresso que o React vai usar
-  onInboxProgresso: (callback) => {
-    const subscription = (_event, value) => callback(value);
-    electron.ipcRenderer.on("inbox-progresso", subscription);
-    return () => electron.ipcRenderer.removeListener("inbox-progresso", subscription);
+const { contextBridge, ipcRenderer } = require("electron");
+contextBridge.exposeInMainWorld("acorreaAPI", {
+  executarPyCad: (payload) => ipcRenderer.invoke("executar-pycad", payload),
+  abrirGinfes: (credentials) => ipcRenderer.invoke("executar-robo-ginfes", credentials),
+  encryptPassword: (password) => ipcRenderer.invoke("encrypt-password", password),
+  selecionarArquivo: (options) => ipcRenderer.invoke("selecionar-arquivo", options),
+  abrirArquivoLocal: (caminho) => ipcRenderer.invoke("abrir-arquivo-local", caminho),
+  // Gatilho para o botão manual
+  sincronizarEmails: () => ipcRenderer.invoke("forcar-sincronizacao"),
+  onWhatsAppQR: (callback) => {
+    const listener = (_event, qr) => callback(qr);
+    ipcRenderer.on("whatsapp-qr", listener);
+    return () => ipcRenderer.removeListener("whatsapp-qr", listener);
   },
-  // Função para forçar uma atualização manual se quiser
-  sincronizarAgora: () => electron.ipcRenderer.invoke("forcar-sincronizacao-inbox"),
-  // Limpador de eventos (boa prática para evitar lentidão)
-  removeInboxListener: () => electron.ipcRenderer.removeAllListeners("inbox-progresso")
+  onInboxProgresso: (callback) => {
+    const listener = (_event, value) => callback(value);
+    ipcRenderer.on("inbox-progresso", listener);
+    return () => ipcRenderer.removeListener("inbox-progresso", listener);
+  },
+  // Novo: Ouvinte para mensagens de log (ERRO ou SUCESSO)
+  onInboxLog: (callback) => {
+    const listener = (_event, msg) => callback(msg);
+    ipcRenderer.on("inbox-log", listener);
+    return () => ipcRenderer.removeListener("inbox-log", listener);
+  },
+  onRefreshInbox: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on("refresh-inbox", listener);
+    return () => ipcRenderer.removeListener("refresh-inbox", listener);
+  }
 });

@@ -15,6 +15,7 @@ import require$$0$5 from "node:buffer";
 import require$$1$6 from "node:stream";
 import require$$5$4 from "path";
 import require$$0$6 from "crypto";
+import pkg from "whatsapp-web.js";
 function __rest(s2, e2) {
   var t2 = {};
   for (var p2 in s2) if (Object.prototype.hasOwnProperty.call(s2, p2) && e2.indexOf(p2) < 0)
@@ -81666,6 +81667,7 @@ async function processarEmails(config2, supabaseUrl, supabaseKey, onProgress) {
     let processados = 0;
     for (const item of messages) {
       processados++;
+      console.log(`Processando e-mail ${processados} de ${total}...`);
       if (onProgress) onProgress(processados, total);
       const allPart = item.parts.find((part) => part.which === "");
       if (!allPart) continue;
@@ -81700,17 +81702,68 @@ async function processarEmails(config2, supabaseUrl, supabaseKey, onProgress) {
     throw err;
   }
 }
+const { Client, LocalAuth } = pkg;
+let wpClient;
+function iniciarWhatsApp(win2, supabaseUrl, serviceKey) {
+  const supabase2 = createClient(supabaseUrl, serviceKey);
+  wpClient = new Client({
+    authStrategy: new LocalAuth({
+      clientId: "acorrea-gestao"
+    }),
+    puppeteer: {
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    }
+  });
+  wpClient.on("qr", (qr) => {
+    win2.webContents.send("whatsapp-qr", qr);
+    console.log("QR Code gerado para o WhatsApp");
+  });
+  wpClient.on("ready", () => {
+    win2.webContents.send("inbox-log", "✅ WhatsApp Conectado!");
+  });
+  wpClient.on("message", async (msg) => {
+    try {
+      const contato = await msg.getContact();
+      const telefone = contato.number;
+      const { data: cliente } = await supabase2.from("clientes").select("id").or(`telefone.ilike.%${telefone}%`).maybeSingle();
+      await supabase2.from("comunicacoes").insert({
+        tipo: "whatsapp",
+        direcao: "entrada",
+        remetente_nome: contato.pushname || contato.name || "Desconhecido",
+        remetente_identificador: telefone,
+        conteudo: msg.body,
+        data_hora: /* @__PURE__ */ new Date(),
+        message_id_externo: msg.id.id,
+        cliente_id: (cliente == null ? void 0 : cliente.id) || null,
+        tags: [cliente ? "cliente_identificado" : "pendente_vinculo"]
+      });
+      console.log("Notificando frontend de nova mensagem...");
+      win2.webContents.send("refresh-inbox");
+      win2.webContents.send("refresh-inbox");
+    } catch (err) {
+      console.error("Erro ao processar mensagem WA:", err);
+    }
+  });
+  wpClient.initialize().catch((err) => console.error("Erro ao iniciar WA:", err));
+}
+async function enviarMensagemWhatsApp(telefone, texto) {
+  if (!wpClient) throw new Error("WhatsApp não iniciado");
+  const chatId = telefone.includes("@c.us") ? telefone : `${telefone}@c.us`;
+  return await wpClient.sendMessage(chatId, texto);
+}
 const __filename$1 = fileURLToPath(import.meta.url);
 const __dirname$1 = path.dirname(__filename$1);
 const SUPABASE_URL = "https://laehlwatdlwvltphjljj.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxhZWhsd2F0ZGx3dmx0cGhqbGpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQyMzM0MjEsImV4cCI6MjA2OTgwOTQyMX0.bM0FMUueazK_hhKYB0C7csYJFrv0dKLW1WzKpzTtao0";
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxhZWhsd2F0ZGx3dmx0cGhqbGpqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDIzMzQyMSwiZXhwIjoyMDY5ODA5NDIxfQ.yz26DTbh25zOk5qvILZ93f9RNbIU5tBoJSVT_CMyy3w";
+const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 let win;
 function createWindow() {
   win = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
+      // Verifique se o arquivo gerado na pasta dist-electron é realmente .mjs ou .js
       preload: path.join(__dirname$1, "preload.mjs"),
       nodeIntegration: false,
       contextIsolation: true
@@ -81727,24 +81780,6 @@ ipcMain.handle("encrypt-password", async (_, password) => {
   if (!safeStorage.isEncryptionAvailable()) throw new Error("Criptografia indisponível");
   return safeStorage.encryptString(password).toString("base64");
 });
-async function sincronizarInbox() {
-  try {
-    const { data: creds } = await supabase.from("credenciais_servicos").select("*").eq("servico", "inbox_email").single();
-    if (creds && creds.senha_hash) {
-      const senhaReal = decryptPassword(creds.senha_hash);
-      await processarEmails(
-        { usuario: creds.usuario, senha_descriptografada: senhaReal },
-        SUPABASE_URL,
-        SUPABASE_KEY,
-        (atual, total) => {
-          win == null ? void 0 : win.webContents.send("inbox-progresso", { atual, total });
-        }
-      );
-    }
-  } catch (e2) {
-    console.error("Erro na sincronização:", e2);
-  }
-}
 ipcMain.handle("executar-robo-ginfes", async (_, credentials) => {
   const { usuario, senha_hash, clienteCnpj, valorNota, descricaoServico } = credentials;
   const senhaReal = decryptPassword(senha_hash);
@@ -81818,8 +81853,40 @@ ipcMain.handle("selecionar-arquivo", async (_, options) => {
 ipcMain.handle("abrir-arquivo-local", async (_, caminho) => {
   shell.openPath(caminho);
 });
+ipcMain.handle("forcar-sincronizacao", async () => {
+  await sincronizarInbox();
+  return { success: true };
+});
+async function sincronizarInbox() {
+  try {
+    win == null ? void 0 : win.webContents.send("inbox-log", "Iniciando conexão com Locaweb...");
+    const { data: creds } = await supabase.from("credenciais_servicos").select("*").eq("servico", "inbox_email").single();
+    if (!creds) {
+      win == null ? void 0 : win.webContents.send("inbox-log", "Erro: Credenciais não encontradas no Supabase.");
+      return;
+    }
+    const senhaReal = decryptPassword(creds.senha_hash);
+    win == null ? void 0 : win.webContents.send("inbox-log", "Autenticando...");
+    await processarEmails(
+      { usuario: creds.usuario, senha_descriptografada: senhaReal },
+      SUPABASE_URL,
+      SERVICE_KEY,
+      (atual, total) => {
+        win == null ? void 0 : win.webContents.send("inbox-progresso", { atual, total });
+      }
+    );
+    win == null ? void 0 : win.webContents.send("inbox-log", "Sincronização finalizada com sucesso!");
+  } catch (e2) {
+    win == null ? void 0 : win.webContents.send("inbox-log", `Erro crítico: ${e2.message}`);
+    console.error(e2);
+  }
+}
+ipcMain.handle("enviar-whatsapp", async (_, { telefone, mensagem }) => {
+  return await enviarMensagemWhatsApp(telefone, mensagem);
+});
 app.whenReady().then(() => {
   createWindow();
+  iniciarWhatsApp(win, SUPABASE_URL, SERVICE_KEY);
   setTimeout(sincronizarInbox, 6e4);
   setInterval(sincronizarInbox, 10 * 60 * 1e3);
 });
