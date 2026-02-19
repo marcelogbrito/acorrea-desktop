@@ -1,5 +1,5 @@
 import imaps from 'imap-simple';
-import { simpleParser, ParsedMail } from 'mailparser';
+import { simpleParser } from 'mailparser';
 import { createClient } from '@supabase/supabase-js';
 
 interface EmailConfig {
@@ -58,7 +58,7 @@ export async function processarEmails(
     let processados = 0;
     for (const item of messages) {
   processados++;
-  console.log(`Processando e-mail ${processados} de ${total}...`); // ADICIONE ISSO
+  //console.log(`Processando e-mail ${processados} de ${total}...`); // ADICIONE ISSO
   
   if (onProgress) onProgress(processados, total);
 

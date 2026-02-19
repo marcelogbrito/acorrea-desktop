@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { FormularioCobranca } from './FormularioCobranca'
 import { GerenciamentoProjetos } from './GerenciamentoProjetos'
+import { NovaVistoriaModal } from './NovaVistoriaModal' 
+import { VistoriaDetalhes } from './VistoriaDetalhes' 
 
 interface Visao360Props {
   cliente: any;
@@ -10,30 +12,41 @@ interface Visao360Props {
 }
 
 export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props) {
+  // --- 1. TODOS OS HOOKS (Devem estar no topo) ---
   const [loading, setLoading] = useState(true)
   const [abaAtiva, setAbaAtiva] = useState<'geral' | 'projetos'>('geral')
   
-  // Estados de Dados do Banco
   const [vistorias, setVistorias] = useState<any[]>([])
   const [orcamentos, setOrcamentos] = useState<any[]>([])
-  const [ordensServico, setOrdensServico] = useState<any[]>([])
+  const [ordensServico,  setOrdensServico] = useState<any[]>([])
   const [avcbAtivo, setAvcbAtivo] = useState<any>(null)
   const [notasFiscais, setNotasFiscais] = useState<any[]>([])
   const [contasAReceber, setContasAReceber] = useState<any[]>([])
   
-  // Estados de UI e Upload
   const [abrirNovaCobranca, setAbrirNovaCobranca] = useState(false)
+  const [abrirNovaVistoria, setAbrirNovaVistoria] = useState(false)
+  const [vistoriaAbertaId, setVistoriaAbertaId] = useState<string | null>(null)
+  
   const [subindoNotaId, setSubindoNotaId] = useState<string | null>(null)
   const [subindoBoletoId, setSubindoBoletoId] = useState<string | null>(null)
 
+  // Estados para Edição de Dados do Cliente
+  const [editandoDados, setEditandoDados] = useState(false)
+  const [dadosCliente, setDadosCliente] = useState(cliente)
+
+  console.log(orcamentos,ordensServico);
+
+
   useEffect(() => {
     loadClienteData()
+    setDadosCliente(cliente) // Sincroniza se o cliente pai mudar
   }, [cliente.id])
+
+  // --- 2. FUNÇÕES DE LÓGICA ---
 
   async function loadClienteData() {
     setLoading(true)
     try {
-      // Busca simultânea de todas as frentes do cliente
       const [resVist, resOrc, resOS, resAvcb, resNF, resRec] = await Promise.all([
         supabase.from('vistoria_previa_avcb').select('*, checklist_vistoria_avcb(*)').eq('cliente_id', cliente.id).order('created_at', { ascending: false }),
         supabase.from('orcamentos').select('*, servico:servico_id(nome_servico, tipo_servico:tipo_servico_id(nome))').eq('cliente_id', cliente.id).order('data_envio', { ascending: false }),
@@ -54,7 +67,26 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
     }
   }
 
-  // --- LÓGICA FINANCEIRA ---
+  const salvarDadosGerais = async () => {
+    try {
+      const { error } = await supabase
+        .from('clientes')
+        .update({
+          nome: dadosCliente.nome,
+          cnpj_cpf: dadosCliente.cnpj_cpf,
+          endereco: dadosCliente.endereco,
+          telefone: dadosCliente.telefone,
+          email: dadosCliente.email
+        })
+        .eq('id', cliente.id)
+
+      if (error) throw error
+      alert("✅ Dados do cliente atualizados!")
+      setEditandoDados(false)
+    } catch (err: any) {
+      alert("Erro ao atualizar: " + err.message)
+    }
+  }
 
   const dispararNFParaReceita = (receita: any) => {
     const confirmar = window.confirm(`Deseja disparar a emissão da NF para a parcela de R$ ${receita.valor_receber}?`);
@@ -114,7 +146,18 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
     window.open(`https://web.whatsapp.com/send?phone=55${cliente.telefone?.replace(/\D/g, '')}&text=${msg}`, '_blank')
   }
 
+  // --- 3. RENDERIZAÇÃO CONDICIONAL ---
+
   if (loading) return <div style={{ padding: '20px' }}>Carregando dados...</div>
+
+  if (vistoriaAbertaId) {
+    return (
+      <VistoriaDetalhes 
+        vistoriaId={vistoriaAbertaId} 
+        onBack={() => { setVistoriaAbertaId(null); loadClienteData(); }} 
+      />
+    )
+  }
 
   return (
     <div style={{ padding: '20px', backgroundColor: '#f4f7f6', minHeight: '100vh', fontFamily: 'Segoe UI, sans-serif' }}>
@@ -122,7 +165,7 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
       {/* HEADER FIXO */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
         <button onClick={onBack} style={btnBackStyle}>← Voltar para Lista</button>
-        <h2 style={{ margin: 0 }}>🔍 Cliente: {cliente.nome}</h2>
+        <h2 style={{ margin: 0 }}>🔍 Cliente: {dadosCliente.nome}</h2>
         <div style={{ padding: '8px 16px', borderRadius: '4px', backgroundColor: avcbAtivo ? '#d4edda' : '#f8d7da', color: avcbAtivo ? '#155724' : '#721c24', fontWeight: 'bold' }}>
           {avcbAtivo ? `AVCB Vence: ${new Date(avcbAtivo.validade).toLocaleDateString()}` : 'Sem AVCB Ativo'}
         </div>
@@ -137,13 +180,66 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
       {abaAtiva === 'geral' ? (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
           
-          {/* COLUNA 1: DADOS E FINANCEIRO */}
+          {/* COLUNA 1: DADOS EDITÁVEIS E FINANCEIRO */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <section style={cardStyle}>
-              <h3 style={cardTitleStyle}>📋 Dados do Condomínio</h3>
-              <p><strong>CNPJ:</strong> {cliente.cnpj_cpf}</p>
-              <p><strong>Endereço:</strong> {cliente.endereco}</p>
-              <p><strong>Contato:</strong> {cliente.telefone} | {cliente.email}</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', alignItems: 'center' }}>
+                <h3 style={cardTitleStyle}>📋 Dados do Condomínio</h3>
+                <button 
+                  onClick={() => editandoDados ? salvarDadosGerais() : setEditandoDados(true)}
+                  style={editandoDados ? btnGreenStyle : btnViewStyle}
+                >
+                  {editandoDados ? 'Salvar Alterações' : 'Editar Dados'}
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                <div>
+                  <label style={miniLabelStyle}>Nome do Condomínio</label>
+                  <input 
+                    disabled={!editandoDados} 
+                    style={editandoDados ? inputEditableStyle : inputStaticStyle} 
+                    value={dadosCliente.nome} 
+                    onChange={e => setDadosCliente({...dadosCliente, nome: e.target.value})} 
+                  />
+                </div>
+                <div>
+                  <label style={miniLabelStyle}>CNPJ/CPF</label>
+                  <input 
+                    disabled={!editandoDados} 
+                    style={editandoDados ? inputEditableStyle : inputStaticStyle} 
+                    value={dadosCliente.cnpj_cpf} 
+                    onChange={e => setDadosCliente({...dadosCliente, cnpj_cpf: e.target.value})} 
+                  />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label style={miniLabelStyle}>Endereço</label>
+                  <input 
+                    disabled={!editandoDados} 
+                    style={editandoDados ? inputEditableStyle : inputStaticStyle} 
+                    value={dadosCliente.endereco} 
+                    onChange={e => setDadosCliente({...dadosCliente, endereco: e.target.value})} 
+                  />
+                </div>
+                <div>
+                  <label style={miniLabelStyle}>Telefone</label>
+                  <input 
+                    disabled={!editandoDados} 
+                    style={editandoDados ? inputEditableStyle : inputStaticStyle} 
+                    value={dadosCliente.telefone} 
+                    onChange={e => setDadosCliente({...dadosCliente, telefone: e.target.value})} 
+                  />
+                </div>
+                <div>
+                  <label style={miniLabelStyle}>E-mail</label>
+                  <input 
+                    disabled={!editandoDados} 
+                    style={editandoDados ? inputEditableStyle : inputStaticStyle} 
+                    value={dadosCliente.email} 
+                    onChange={e => setDadosCliente({...dadosCliente, email: e.target.value})} 
+                  />
+                </div>
+              </div>
             </section>
 
             <section style={cardStyle}>
@@ -183,8 +279,35 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
             </section>
           </div>
 
-          {/* COLUNA 2: HISTÓRICO DE NOTAS E OPERACIONAL */}
+          {/* COLUNA 2: VISTORIAS E HISTÓRICO */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            
+            <section style={cardStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <h3 style={cardTitleStyle}>🕵️ Vistorias Técnicas</h3>
+                <button onClick={() => setAbrirNovaVistoria(true)} style={btnGreenStyle}>+ Nova Vistoria</button>
+              </div>
+
+              {vistorias.length === 0 ? (
+                <p style={{ color: '#999', fontSize: '13px', textAlign: 'center' }}>Nenhuma vistoria registrada.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {vistorias.map(v => (
+                    <div key={v.id} style={itemVistoriaStyle}>
+                      <div>
+                        <div style={{ fontWeight: 'bold' }}>{new Date(v.data_agendamento).toLocaleDateString()}</div>
+                        <div style={{ fontSize: '12px', color: '#666' }}>{v.nome_edificacao}</div>
+                        <div style={{ fontSize: '11px', color: v.situacao === 'concluida' ? 'green' : 'orange' }}>
+                          Status: {v.situacao ? v.situacao.toUpperCase() : 'AGENDADA'}
+                        </div>
+                      </div>
+                      <button onClick={() => setVistoriaAbertaId(v.id)} style={btnOutlineStyle}>Abrir Checklist 📝</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
             <section style={cardStyle}>
               <h3 style={cardTitleStyle}>📄 Histórico de Notas Fiscais</h3>
               {notasFiscais.map(nf => (
@@ -209,27 +332,27 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
                 </div>
               ))}
             </section>
-
-            <section style={cardStyle}>
-              <h3 style={cardTitleStyle}>🏗️ Status de Engenharia</h3>
-              <p><strong>Vistorias Realizadas:</strong> {vistorias.length}</p>
-              <p><strong>OS em Aberto:</strong> {ordensServico.filter(os => os.situacao !== 'concluida').length}</p>
-              <p><strong>Orçamentos Enviados:</strong> {orcamentos.length}</p>
-            </section>
           </div>
 
         </div>
       ) : (
-        /* ABA DE PROJETOS AUTOMAÇÃO */
         <GerenciamentoProjetos clienteId={cliente.id} clienteNome={cliente.nome} />
       )}
 
-      {/* MODAL COBRANÇA */}
+      {/* MODAIS */}
       {abrirNovaCobranca && (
         <FormularioCobranca 
           clienteId={cliente.id} 
           onCancelar={() => setAbrirNovaCobranca(false)} 
           onSucesso={() => { setAbrirNovaCobranca(false); loadClienteData(); }} 
+        />
+      )}
+
+      {abrirNovaVistoria && (
+        <NovaVistoriaModal 
+           clienteId={cliente.id}
+           onClose={() => setAbrirNovaVistoria(false)}
+           onSuccess={() => { setAbrirNovaVistoria(false); loadClienteData(); }}
         />
       )}
     </div>
@@ -250,3 +373,10 @@ const btnPackageStyle = { padding: '4px 8px', fontSize: '11px', backgroundColor:
 const btnZapStyle = { padding: '4px 8px', fontSize: '11px', backgroundColor: '#25D366', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' };
 const btnUploadBoletoStyle = { padding: '4px 8px', backgroundColor: '#007bff', color: 'white', borderRadius: '3px', cursor: 'pointer', fontSize: '11px' };
 const btnUploadNotaStyle = { padding: '4px 8px', backgroundColor: '#28a745', color: 'white', borderRadius: '3px', cursor: 'pointer', fontSize: '11px' };
+const itemVistoriaStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', border: '1px solid #f0f0f0', borderRadius: '6px', backgroundColor: '#fdfdfd' };
+const btnOutlineStyle = { background: 'white', border: '1px solid #007bff', color: '#007bff', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' as 'bold' };
+
+// ESTILOS DE EDIÇÃO
+const miniLabelStyle = { fontSize: '11px', color: '#999', textTransform: 'uppercase' as 'uppercase', display: 'block', marginBottom: '2px' };
+const inputStaticStyle = { width: '100%', padding: '5px 0', border: 'none', background: 'transparent', fontWeight: 'bold' as 'bold', color: '#333', fontSize: '14px' };
+const inputEditableStyle = { width: '100%', padding: '8px', border: '1px solid #007bff', borderRadius: '4px', background: '#fff', fontSize: '14px', boxSizing: 'border-box' as 'border-box' };

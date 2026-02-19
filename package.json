@@ -1,21 +1,25 @@
 {
   "name": "acorrea-gestao",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
+  "release": "npm run build && tsx scripts/deploy-version.ts",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.97.0",
     "bufferutil": "^4.1.0",
+    "compare-versions": "^6.1.1",
+    "docxtemplater": "^3.68.2",
     "imap-simple": "^5.1.0",
     "jspdf": "^4.1.0",
     "jspdf-autotable": "^5.0.7",
     "mailparser": "^3.9.3",
+    "pizzip": "^3.2.0",
     "playwright": "^1.58.2",
     "playwright-core": "^1.58.2",
     "qrcode-terminal": "^0.12.0",
@@ -27,8 +31,10 @@
     "whatsapp-web.js": "^1.34.6"
   },
   "devDependencies": {
+    "@types/dotenv": "^6.1.1",
     "@types/imap-simple": "^4.2.10",
     "@types/mailparser": "^3.4.6",
+    "@types/node": "^25.3.0",
     "@types/react": "^18.2.64",
     "@types/react-dom": "^18.2.21",
     "@typescript-eslint/eslint-plugin": "^7.1.1",
@@ -39,11 +45,39 @@
     "eslint": "^8.57.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
+    "tsx": "^4.21.0",
     "typescript": "^5.2.2",
     "vite": "^5.1.6",
     "vite-plugin-electron": "^0.28.6",
     "vite-plugin-electron-renderer": "^0.14.5",
     "vite-plugin-static-copy": "^3.2.0"
   },
-  "main": "dist-electron/main.js"
+  "main": "dist-electron/main.js",
+  "build": {
+    "appId": "com.acorrea.gestao",
+    "productName": "Acorrea Gestao",
+    "cscLink": null,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/",
+        "to": "resources/"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "resources/icon.ico",
+      "verifyUpdateCodeSignature": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
 }

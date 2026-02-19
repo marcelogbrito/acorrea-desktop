@@ -26,7 +26,7 @@ export function iniciarWhatsApp(win: any, supabaseUrl: string, serviceKey: strin
   // Tipamos o 'qr' como string
   wpClient.on('qr', (qr: string) => {
     win.webContents.send('whatsapp-qr', qr);
-    console.log('QR Code gerado para o WhatsApp');
+    //console.log('QR Code gerado para o WhatsApp');
   });
 
   wpClient.on('ready', () => {
