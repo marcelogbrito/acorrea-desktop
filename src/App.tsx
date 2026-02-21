@@ -98,10 +98,38 @@ function App() {
   if (clienteAtivo) {
     return (
       <Visao360 
-        cliente={clienteAtivo} 
-        onBack={() => setClienteAtivo(null)} 
-        onSolicitarEmissao={(cli, d) => setClienteParaEmissao({...cli, ...d})}
-      />
+  cliente={clienteAtivo} 
+  onBack={() => setClienteAtivo(null)} 
+  onSolicitarEmissao={async (cli, dados) => {
+    try {
+      // 1. Busca a credencial do Ginfes no banco
+      const { data: creds, error } = await supabase
+        .from('credenciais_servicos')
+        .select('*')
+        .eq('servico', 'ginfes_santo_andre')
+        .single();
+
+      if (error || !creds) {
+        alert("Credenciais do Ginfes não encontradas!");
+        return;
+      }
+
+      // 2. CHAMA O ROBÔ (window.acorreaAPI definida no seu preload.ts)
+      // @ts-ignore
+      const resultado = await window.acorreaAPI.abrirGinfes({
+        usuario: creds.usuario,
+        senha_hash: creds.senha_hash,
+        clienteCnpj: cli.cnpj_cpf,
+        valorNota: dados.valor,
+        descricaoServico: dados.descricao
+      });
+
+      alert(resultado);
+    } catch (err: any) {
+      alert("Erro ao disparar automação: " + err.message);
+    }
+  }}
+/>
     )
   }
 

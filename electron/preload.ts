@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('acorreaAPI', {
     selecionarArquivo: (options: any) => ipcRenderer.invoke('selecionar-arquivo', options),
     abrirArquivoLocal: (caminho: string) => ipcRenderer.invoke('abrir-arquivo-local', caminho),
     gerarRelatorioVistoriaPrevia: (dados: any) => ipcRenderer.invoke('gerar-relatorio-vistoria-previa', dados),
+    gerarPropostaAssessoriaLaudos: (dados: any) => ipcRenderer.invoke('gerar-proposta-assessoria-laudos', dados),
 
     // Gatilho para o botão manual
   sincronizarEmails: () => ipcRenderer.invoke('forcar-sincronizacao'),

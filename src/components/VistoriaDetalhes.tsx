@@ -217,6 +217,7 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
       <Section title="2. Bomba de Incêndio" isOpen={openSections.bi} onToggle={() => toggleSection('bi')}>
         <BooleanRow label="Existe Bomba?" field="bi_existe_bomba" value={checklist.bi_existe_bomba} onChange={updateField} />
         <BooleanRow label="Protegida com PCF?" field="bi_protegida_pcf" value={checklist.bi_protegida_pcf} onChange={updateField} />
+         <BooleanRow label="Nec. Instalação PCF?" field="bi_necessidade_pcf" value={checklist.bi_necessidade_pcf} onChange={updateField} />
         <BooleanRow label="Botoeira no Barrilete?" field="bi_botoeira_barrilete" value={checklist.bi_botoeira_barrilete} onChange={updateField} />
         <BooleanRow label="Botoeira nos Pavimentos?" field="bi_botoeira_pavimentos" value={checklist.bi_botoeira_pavimentos} onChange={updateField} />
         <BooleanRow label="Teste Funcionou?" field="bi_teste_funcionou" value={checklist.bi_teste_funcionou} onChange={updateField} />
@@ -276,6 +277,7 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
   ]} 
 />
         <BooleanRow label="Altura Conforme?" field="cm_altura_conforme" value={checklist.cm_altura_conforme} onChange={updateField} />
+        <BooleanRow label="Extintor Identificado?" field="cm_extintor_identificado" value={checklist.cm_extintor_identificado} onChange={updateField} />
         <BooleanRow label="Desobstruído?" field="cm_desobstruido" value={checklist.cm_desobstruido} onChange={updateField} />
         <BooleanRow label="Interfone?" field="cm_interfone" value={checklist.cm_interfone} onChange={updateField} />
         <BooleanRow label="Detector Fumaça?" field="cm_detector_fumaca" value={checklist.cm_detector_fumaca} onChange={updateField} />

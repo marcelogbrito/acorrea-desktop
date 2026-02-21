@@ -24,7 +24,7 @@ export function FormularioCobranca({ clienteId, onSucesso, onCancelar }: any) {
         nr_parcela: i + 1,
         qt_parcelas: parcelas,
         data_vencimento: dataVenc.toISOString().split('T')[0],
-        situacao: 'Pendente',
+        situacao: 'a_receber',
         parcelado: parcelas > 1
       })
     }

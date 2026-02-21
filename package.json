@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
-  "release": "npm run build && tsx scripts/deploy-version.ts",
+    "release": "npm run build && tsx scripts/deploy-version.ts",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
@@ -19,6 +19,7 @@
     "jspdf": "^4.1.0",
     "jspdf-autotable": "^5.0.7",
     "mailparser": "^3.9.3",
+    "node-machine-id": "^1.1.12",
     "pizzip": "^3.2.0",
     "playwright": "^1.58.2",
     "playwright-core": "^1.58.2",
