@@ -66,10 +66,11 @@
       "dist-electron/**/*"
     ],
     "extraResources": [
-      {
-        "from": "resources/",
-        "to": "resources/"
-      }
+     {
+    "from": "resources/templates",
+    "to": "templates",
+    "filter": ["**/*"]
+  }
     ],
     "win": {
       "target": "nsis",

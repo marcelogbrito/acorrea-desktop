@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('acorreaAPI', {
     abrirArquivoLocal: (caminho: string) => ipcRenderer.invoke('abrir-arquivo-local', caminho),
     gerarRelatorioVistoriaPrevia: (dados: any) => ipcRenderer.invoke('gerar-relatorio-vistoria-previa', dados),
     gerarPropostaAssessoriaLaudos: (dados: any) => ipcRenderer.invoke('gerar-proposta-assessoria-laudos', dados),
+    gerarLaudosLote: (payload: any) => ipcRenderer.invoke('gerar-laudos-lote', payload),
 
     // Gatilho para o botão manual
   sincronizarEmails: () => ipcRenderer.invoke('forcar-sincronizacao'),

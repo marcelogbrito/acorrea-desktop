@@ -40,33 +40,35 @@ function App() {
     }
   }
 
-  const handleCadastrarCliente = async () => {
-    if (!novoCliente.nome || !novoCliente.cnpj_cpf) {
-      return alert("Nome e CNPJ/CPF são obrigatórios.");
-    }
+ // Substitua sua função handleCadastrarCliente por esta:
+const handleCadastrarCliente = async () => {
+  if (!novoCliente.nome || !novoCliente.cnpj_cpf) {
+    return alert("Nome e CNPJ/CPF são obrigatórios.");
+  }
 
-    setLoading(true);
-    try {
-      const { error } = await supabase
-        .from('clientes')
-        .insert([{
-          nome: novoCliente.nome.toUpperCase(),
-          cnpj_cpf: novoCliente.cnpj_cpf.replace(/\D/g, ''), // Limpa máscara
-          parceiro_id: novoCliente.parceiro_id || null,
-        }]);
+  setLoading(true); // Trava os botões para evitar duplo clique
+  try {
+    const { error } = await supabase
+      .from('clientes')
+      .insert([{
+        nome: novoCliente.nome.toUpperCase(),
+        cnpj_cpf: novoCliente.cnpj_cpf.replace(/\D/g, ''),
+        parceiro_id: novoCliente.parceiro_id || null,
+      }]);
 
-      if (error) throw error;
+    if (error) throw error;
 
-      alert("✅ Cliente cadastrado com sucesso!");
-      setNovoCliente({ nome: '', cnpj_cpf: '', parceiro_id: '' });
-      fetchData(); // Recarrega a lista
-    } catch (err: any) {
-      console.error(err);
-      alert("❌ Erro ao cadastrar: " + (err.message || "Verifique os dados"));
-    } finally {
-      setLoading(false);
-    }
-  };
+    alert("✅ Cliente cadastrado com sucesso!");
+    setNovoCliente({ nome: '', cnpj_cpf: '', parceiro_id: '' });
+    
+    // Resetamos o loading ANTES de buscar os novos dados para liberar a UI
+    setLoading(false); 
+    await fetchData(); 
+  } catch (err: any) {
+    setLoading(false);
+    alert("❌ Erro ao cadastrar: " + (err.message || "Verifique os dados"));
+  }
+};
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {

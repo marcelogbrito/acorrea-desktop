@@ -14,6 +14,7 @@ import { processarEmails } from '../automation/email_worker';
 import { iniciarWhatsApp, enviarMensagemWhatsApp } from '../automation/whatsapp_worker';
 import { gerarRelatorioVistoriaPrevia } from '../automation/report_worker';
 import { gerarPropostaAssessoriaLaudos } from '../automation/proposal_worker';
+import { gerarLaudoWorker } from '../automation/laudo_worker';
 
 // Configuração de diretórios
 const __filename = fileURLToPath(import.meta.url);
@@ -281,6 +282,52 @@ ipcMain.handle('gerar-proposta-assessoria-laudos', async (_, dadosExportacao) =>
     return { success: true };
   } catch (err: any) {
     console.error("Erro na Proposta:", err);
+    throw err;
+  }
+});
+
+ipcMain.handle('gerar-laudos-lote', async (_, payload) => {
+  const { cliente, laudosSelecionados, nr_rrt } = payload;
+
+  try {
+    // Formata a data (Ex: 22 de fevereiro de 2026)
+    const dataFormatada = new Date().toLocaleDateString('pt-BR', {
+      day: 'numeric', month: 'long', year: 'numeric'
+    });
+
+    // Mapeia as variáveis que existem nos documentos
+    const dadosTemplate = {
+      nome_cliente: String(cliente.nome).toUpperCase(),
+      endereco_cliente: String(cliente.endereco).toUpperCase(),
+      endereço_cliente: String(cliente.endereco).toUpperCase(), // Mapeado com 'ç' como redundância para evitar erros no Word
+      data_extenso: dataFormatada,
+      nr_rrt: nr_rrt || 'NÃO INFORMADO'
+    };
+
+    const arquivosGerados = [];
+    const nomeAmigavel = cliente.nome.replace(/[^a-z0-9]/gi, '_');
+
+    // Gera um arquivo para cada laudo selecionado
+    for (const laudo of laudosSelecionados) {
+      const templatePath = app.isPackaged 
+        ? path.join(process.resourcesPath, 'templates', laudo.arquivo) 
+        : path.join(__dirname, '..', 'resources', 'templates', laudo.arquivo);
+
+      const nomeArquivo = `Laudo_${laudo.nome}_${nomeAmigavel}.docx`;
+      const outputPath = path.join(app.getPath('downloads'), nomeArquivo);
+
+      await gerarLaudoWorker(dadosTemplate, templatePath, outputPath);
+      arquivosGerados.push(outputPath);
+    }
+
+    // Abre a pasta de downloads com os arquivos selecionados
+    if (arquivosGerados.length > 0) {
+      shell.showItemInFolder(arquivosGerados[0]);
+    }
+
+    return { success: true, quantidade: arquivosGerados.length };
+  } catch (err: any) {
+    console.error("Erro na geração de laudos:", err);
     throw err;
   }
 });

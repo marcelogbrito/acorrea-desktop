@@ -4,7 +4,8 @@ import { FormularioCobranca } from './FormularioCobranca'
 import { GerenciamentoProjetos } from './GerenciamentoProjetos'
 import { NovaVistoriaModal } from './NovaVistoriaModal' 
 import { VistoriaDetalhes } from './VistoriaDetalhes' 
-import { ModalPropostaAssessoriaLaudos } from './ModalPropostaAssessoriaLaudos' // <-- NOVO IMPORT
+import { ModalPropostaAssessoriaLaudos } from './ModalPropostaAssessoriaLaudos' 
+import { ModalGeradorLaudos } from './ModalGeradorLaudos';
 
 interface Visao360Props {
   cliente: any;
@@ -31,6 +32,7 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
   const [subindoBoletoId, setSubindoBoletoId] = useState<string | null>(null)
   const [editandoDados, setEditandoDados] = useState(false)
   const [dadosCliente, setDadosCliente] = useState(cliente)
+  const [abrirGeradorLaudos, setAbrirGeradorLaudos] = useState(false);
 
   useEffect(() => {
     loadClienteData()
@@ -131,14 +133,45 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
     window.open(`https://web.whatsapp.com/send?phone=55${cliente.telefone?.replace(/\D/g, '')}&text=${msg}`, '_blank')
   }
 
-  const alterarSituacaoOrcamento = async (id: string, novaSituacao: string) => {
+ // Dentro da sua Visao360.tsx
+
+const alterarSituacaoOrcamento = async (id: string, novaSituacao: string) => {
   const { error } = await supabase
     .from('orcamentos')
     .update({ situacao_orcamento: novaSituacao })
     .eq('id', id);
   
-  if (!error) loadClienteData();
-  else alert("Erro ao atualizar situação: " + error.message);
+  if (error) {
+    alert("Erro ao atualizar situação: " + error.message);
+    return;
+  }
+
+  // Lógica de Lembrete Próprio
+  if (novaSituacao === 'Aprovado') {
+    const confirmar = window.confirm("Orçamento aprovado! Gerar lembrete de agendamento de vistoria?");
+    
+    if (confirmar) {
+      const amanha = new Date();
+      amanha.setDate(amanha.getDate() + 1);
+      amanha.setHours(9, 0, 0, 0); // Define para amanhã às 09:00
+
+      const { error: errorLembrete } = await supabase
+        .from('lembretes')
+        .insert({
+          cliente_id: cliente.id,
+          titulo: `📞 Ligar para agendar Vistoria: ${dadosCliente.nome}`,
+          descricao: `Orçamento aprovado em ${new Date().toLocaleDateString()}. Necessário agendar vistoria prévia.`,
+          data_lembrete: amanha.toISOString(),
+          prioridade: 'alta'
+        });
+
+      if (!errorLembrete) {
+        alert("✅ Lembrete registrado no sistema!");
+      }
+    }
+  }
+  
+  loadClienteData();
 };
 
   if (loading) return <div style={{ padding: '20px' }}>Carregando dados...</div>
@@ -297,6 +330,14 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
                 </div>
               ))}
             </section>
+{/*SEÇÃO EMISSAO DE LAUDOS */}
+            <section style={cardStyle}>
+  <div style={cardHeaderStyle}>
+    <h3 style={{ margin: 0 }}>🖨️ Emissão de Laudos</h3>
+    <button onClick={() => setAbrirGeradorLaudos(true)} style={{...btnGreenStyle, backgroundColor: '#007bff'}}>Gerar Laudos</button>
+  </div>
+  <p style={{ fontSize: '12px', color: '#666' }}>Selecione e gere atestados e laudos técnicos em lote para este condomínio.</p>
+</section>
 
             {/* SEÇÃO NOTAS FISCAIS */}
             <section style={cardStyle}>
@@ -333,6 +374,9 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
       {abrirNovaProposta && (
         <ModalPropostaAssessoriaLaudos cliente={cliente} onClose={() => { setAbrirNovaProposta(false); loadClienteData(); }} />
       )}
+      {abrirGeradorLaudos && (
+  <ModalGeradorLaudos cliente={cliente} onClose={() => setAbrirGeradorLaudos(false)} />
+)}
     </div>
   )
 }
