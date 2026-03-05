@@ -1,10 +1,11 @@
+//src\components\Visao360.tsx
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { FormularioCobranca } from './FormularioCobranca'
 import { GerenciamentoProjetos } from './GerenciamentoProjetos'
 import { NovaVistoriaModal } from './NovaVistoriaModal' 
 import { VistoriaDetalhes } from './VistoriaDetalhes' 
-import { ModalPropostaAssessoriaLaudos } from './ModalPropostaAssessoriaLaudos' 
+import { ModalNovaProposta } from './ModalNovaProposta' // <-- IMPORTAÇÃO CORRIGIDA
 import { ModalGeradorLaudos } from './ModalGeradorLaudos';
 
 interface Visao360Props {
@@ -21,11 +22,11 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
   const [avcbAtivo, setAvcbAtivo] = useState<any>(null)
   const [notasFiscais, setNotasFiscais] = useState<any[]>([])
   const [contasAReceber, setContasAReceber] = useState<any[]>([])
-  const [orcamentos, setOrcamentos] = useState<any[]>([]) // <-- NOVO ESTADO
+  const [orcamentos, setOrcamentos] = useState<any[]>([])
   
   const [abrirNovaCobranca, setAbrirNovaCobranca] = useState(false)
   const [abrirNovaVistoria, setAbrirNovaVistoria] = useState(false)
-  const [abrirNovaProposta, setAbrirNovaProposta] = useState(false) // <-- NOVO MODAL
+  const [abrirNovaProposta, setAbrirNovaProposta] = useState(false) 
   const [vistoriaAbertaId, setVistoriaAbertaId] = useState<string | null>(null)
   
   const [subindoNotaId, setSubindoNotaId] = useState<string | null>(null)
@@ -48,7 +49,7 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
         supabase.from('avcbs_expedidas').select('*').eq('cliente_id', cliente.id).order('validade', { ascending: false }).limit(1),
         supabase.from('notas_fiscais').select('*, servicos(nome_servico)').eq('cliente_id', cliente.id).order('data_emissao', { ascending: false }),
         supabase.from('receitas').select('*').eq('cliente_id', cliente.id).order('data_vencimento', { ascending: true }),
-        supabase.from('orcamentos').select('*').eq('cliente_id', cliente.id).order('created_at', { ascending: false }) // <-- BUSCA ORÇAMENTOS
+        supabase.from('orcamentos').select('*').eq('cliente_id', cliente.id).order('created_at', { ascending: false })
       ])
       setVistorias(resVist.data || [])
       setAvcbAtivo(resAvcb.data?.[0] || null)
@@ -133,46 +134,39 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
     window.open(`https://web.whatsapp.com/send?phone=55${cliente.telefone?.replace(/\D/g, '')}&text=${msg}`, '_blank')
   }
 
- // Dentro da sua Visao360.tsx
-
-const alterarSituacaoOrcamento = async (id: string, novaSituacao: string) => {
-  const { error } = await supabase
-    .from('orcamentos')
-    .update({ situacao_orcamento: novaSituacao })
-    .eq('id', id);
-  
-  if (error) {
-    alert("Erro ao atualizar situação: " + error.message);
-    return;
-  }
-
-  // Lógica de Lembrete Próprio
-  if (novaSituacao === 'Aprovado') {
-    const confirmar = window.confirm("Orçamento aprovado! Gerar lembrete de agendamento de vistoria?");
+  const alterarSituacaoOrcamento = async (id: string, novaSituacao: string) => {
+    const { error } = await supabase
+      .from('orcamentos')
+      .update({ situacao_orcamento: novaSituacao })
+      .eq('id', id);
     
-    if (confirmar) {
-      const amanha = new Date();
-      amanha.setDate(amanha.getDate() + 1);
-      amanha.setHours(9, 0, 0, 0); // Define para amanhã às 09:00
+    if (error) {
+      alert("Erro ao atualizar situação: " + error.message);
+      return;
+    }
 
-      const { error: errorLembrete } = await supabase
-        .from('lembretes')
-        .insert({
-          cliente_id: cliente.id,
-          titulo: `📞 Ligar para agendar Vistoria: ${dadosCliente.nome}`,
-          descricao: `Orçamento aprovado em ${new Date().toLocaleDateString()}. Necessário agendar vistoria prévia.`,
-          data_lembrete: amanha.toISOString(),
-          prioridade: 'alta'
-        });
+    if (novaSituacao === 'Aprovado') {
+      const confirmar = window.confirm("Orçamento aprovado! Gerar lembrete de agendamento de vistoria?");
+      if (confirmar) {
+        const amanha = new Date();
+        amanha.setDate(amanha.getDate() + 1);
+        amanha.setHours(9, 0, 0, 0); 
 
-      if (!errorLembrete) {
-        alert("✅ Lembrete registrado no sistema!");
+        const { error: errorLembrete } = await supabase
+          .from('lembretes')
+          .insert({
+            cliente_id: cliente.id,
+            titulo: `📞 Ligar para agendar Vistoria: ${dadosCliente.nome}`,
+            descricao: `Orçamento aprovado em ${new Date().toLocaleDateString()}. Necessário agendar vistoria prévia.`,
+            data_lembrete: amanha.toISOString(),
+            prioridade: 'alta'
+          });
+
+        if (!errorLembrete) alert("✅ Lembrete registrado no sistema!");
       }
     }
-  }
-  
-  loadClienteData();
-};
+    loadClienteData();
+  };
 
   if (loading) return <div style={{ padding: '20px' }}>Carregando dados...</div>
 
@@ -287,30 +281,31 @@ const alterarSituacaoOrcamento = async (id: string, novaSituacao: string) => {
                 <p style={{ fontSize: '12px', color: '#999', textAlign: 'center' }}>Nenhum orçamento gerado.</p>
               ) : (
                 orcamentos.map(orc => (
-  <div key={orc.id} style={itemStyle}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <div>
-        <span style={{ fontWeight: 'bold' }}>Proposta Assessoria e Laudos</span>
-        <div style={{ fontSize: '11px', color: '#666' }}>
-          Emitido em: {new Date(orc.data_envio).toLocaleDateString()}
-        </div>
-      </div>
-      <select 
-        value={orc.situacao_orcamento} 
-        onChange={(e) => alterarSituacaoOrcamento(orc.id, e.target.value)}
-        style={selectStatusStyle}
-      >
-        <option value="Aguardando">⏳ Aguardando</option>
-        <option value="Aprovado">✅ Aprovado</option>
-        <option value="Recusado">❌ Recusado</option>
-        <option value="Cancelado">🚫 Cancelado</option>
-      </select>
-    </div>
-    <div style={{ marginTop: '5px', display: 'flex', justifyContent: 'space-between' }}>
-      <strong>R$ {Number(orc.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
-    </div>
-  </div>
-))
+                  <div key={orc.id} style={itemStyle}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        {/* TÍTULO DINÂMICO AQUI */}
+                        <span style={{ fontWeight: 'bold', color: '#1a3353' }}>{orc.titulo || 'Proposta Assessoria e Laudos'}</span>
+                        <div style={{ fontSize: '11px', color: '#666' }}>
+                          Emitido em: {new Date(orc.data_envio).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <select 
+                        value={orc.situacao_orcamento} 
+                        onChange={(e) => alterarSituacaoOrcamento(orc.id, e.target.value)}
+                        style={selectStatusStyle}
+                      >
+                        <option value="Aguardando">⏳ Aguardando</option>
+                        <option value="Aprovado">✅ Aprovado</option>
+                        <option value="Recusado">❌ Recusado</option>
+                        <option value="Cancelado">🚫 Cancelado</option>
+                      </select>
+                    </div>
+                    <div style={{ marginTop: '5px', display: 'flex', justifyContent: 'space-between' }}>
+                      <strong>R$ {Number(orc.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+                    </div>
+                  </div>
+                ))
               )}
             </section>
 
@@ -330,14 +325,15 @@ const alterarSituacaoOrcamento = async (id: string, novaSituacao: string) => {
                 </div>
               ))}
             </section>
-{/*SEÇÃO EMISSAO DE LAUDOS */}
+
+            {/* SEÇÃO EMISSAO DE LAUDOS */}
             <section style={cardStyle}>
-  <div style={cardHeaderStyle}>
-    <h3 style={{ margin: 0 }}>🖨️ Emissão de Laudos</h3>
-    <button onClick={() => setAbrirGeradorLaudos(true)} style={{...btnGreenStyle, backgroundColor: '#007bff'}}>Gerar Laudos</button>
-  </div>
-  <p style={{ fontSize: '12px', color: '#666' }}>Selecione e gere atestados e laudos técnicos em lote para este condomínio.</p>
-</section>
+              <div style={cardHeaderStyle}>
+                <h3 style={{ margin: 0 }}>🖨️ Emissão de Laudos</h3>
+                <button onClick={() => setAbrirGeradorLaudos(true)} style={{...btnGreenStyle, backgroundColor: '#007bff'}}>Gerar Laudos</button>
+              </div>
+              <p style={{ fontSize: '12px', color: '#666' }}>Selecione e gere atestados e laudos técnicos em lote para este condomínio.</p>
+            </section>
 
             {/* SEÇÃO NOTAS FISCAIS */}
             <section style={cardStyle}>
@@ -364,7 +360,7 @@ const alterarSituacaoOrcamento = async (id: string, novaSituacao: string) => {
         <GerenciamentoProjetos clienteId={cliente.id} clienteNome={cliente.nome} />
       )}
 
-      {/* MODAIS */}
+      {/* MODAIS: AQUI A CHAMADA DO MODAL DE PROPOSTA FOI CORRIGIDA */}
       {abrirNovaCobranca && (
         <FormularioCobranca clienteId={cliente.id} onCancelar={() => setAbrirNovaCobranca(false)} onSucesso={() => { setAbrirNovaCobranca(false); loadClienteData(); }} />
       )}
@@ -372,11 +368,11 @@ const alterarSituacaoOrcamento = async (id: string, novaSituacao: string) => {
         <NovaVistoriaModal clienteId={cliente.id} onClose={() => setAbrirNovaVistoria(false)} onSuccess={() => { setAbrirNovaVistoria(false); loadClienteData(); }} />
       )}
       {abrirNovaProposta && (
-        <ModalPropostaAssessoriaLaudos cliente={cliente} onClose={() => { setAbrirNovaProposta(false); loadClienteData(); }} />
+        <ModalNovaProposta cliente={cliente} onClose={() => { setAbrirNovaProposta(false); loadClienteData(); }} />
       )}
       {abrirGeradorLaudos && (
-  <ModalGeradorLaudos cliente={cliente} onClose={() => setAbrirGeradorLaudos(false)} />
-)}
+        <ModalGeradorLaudos cliente={cliente} onClose={() => setAbrirGeradorLaudos(false)} />
+      )}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 
 // --- COMPONENTES AUXILIARES DE UI ---
@@ -37,14 +37,13 @@ const BooleanRow = ({ label, field, value, onChange, noteField, noteValue }: any
   </div>
 );
 
-const TextRow = ({ label, value, onChange, type = "text", placeholder = "", disabled }: any) => (  
+const TextRow = ({ label, value, onChange, type = "text", placeholder = "" }: any) => (  
   <div style={rowStyle}>
     <label style={labelStyle}>{label}</label>
     <input 
       type={type}
       value={value || ''} 
       onChange={(e) => onChange(e.target.value)}
-      disabled={disabled}
       placeholder={placeholder}
       style={fullWidthInputStyle}
     />
@@ -69,8 +68,7 @@ const OptionsRow = ({ label, field, value, onChange, options }: any) => (
   </div>
 );
 
-// --- NOVOS BOTÕES DE PARECER TÉCNICO ---
-const ParecerButtons = ({ onSelect, disabled }: any) => {
+const ParecerButtons = ({ onSelect }: any) => {
   const options = [
     { text: "Atendendo os requisitos para emissão do atestado.", color: "#28a745", label: "Conforme" },
     { text: "Atendendo parcialmente os requisitos para emissão do atestado.", color: "#ffc107", label: "Parcial" },
@@ -83,31 +81,25 @@ const ParecerButtons = ({ onSelect, disabled }: any) => {
         <button
           key={opt.label}
           type="button"
-          disabled={disabled}
           onClick={() => onSelect(opt.text)}
           style={{
             padding: '4px 8px',
             fontSize: '11px',
-            cursor: disabled ? 'not-allowed' : 'pointer',
+            cursor: 'pointer',
             backgroundColor: 'white',
             color: opt.color,
             border: `1px solid ${opt.color}`,
             borderRadius: '4px',
             fontWeight: 'bold',
-            transition: 'all 0.2s',
-            opacity: disabled ? 0.6 : 1
+            transition: 'all 0.2s'
           }}
           onMouseEnter={(e: any) => {
-            if(!disabled) {
-              e.target.style.backgroundColor = opt.color;
-              e.target.style.color = 'white';
-            }
+            e.target.style.backgroundColor = opt.color;
+            e.target.style.color = 'white';
           }}
           onMouseLeave={(e: any) => {
-            if(!disabled) {
-              e.target.style.backgroundColor = 'white';
-              e.target.style.color = opt.color;
-            }
+            e.target.style.backgroundColor = 'white';
+            e.target.style.color = opt.color;
           }}
         >
           {opt.label}
@@ -117,8 +109,7 @@ const ParecerButtons = ({ onSelect, disabled }: any) => {
   );
 };
 
-// --- NOVOS BOTÕES DE CONCLUSÃO FINAL ---
-const ConclusaoButtons = ({ onSelect, disabled }: any) => {
+const ConclusaoButtons = ({ onSelect }: any) => {
   const options = [
     { 
       label: "Adequação Rápida", 
@@ -138,31 +129,25 @@ const ConclusaoButtons = ({ onSelect, disabled }: any) => {
         <button
           key={opt.label}
           type="button"
-          disabled={disabled}
           onClick={() => onSelect(opt.text)}
           style={{
             padding: '6px 12px',
             fontSize: '12px',
-            cursor: disabled ? 'not-allowed' : 'pointer',
+            cursor: 'pointer',
             backgroundColor: 'white',
             color: opt.color,
             border: `1px solid ${opt.color}`,
             borderRadius: '4px',
             fontWeight: 'bold',
-            transition: 'all 0.2s',
-            opacity: disabled ? 0.6 : 1
+            transition: 'all 0.2s'
           }}
           onMouseEnter={(e: any) => {
-            if(!disabled){
-              e.target.style.backgroundColor = opt.color;
-              e.target.style.color = 'white';
-            }
+            e.target.style.backgroundColor = opt.color;
+            e.target.style.color = 'white';
           }}
           onMouseLeave={(e: any) => {
-            if(!disabled){
-              e.target.style.backgroundColor = 'white';
-              e.target.style.color = opt.color;
-            }
+            e.target.style.backgroundColor = 'white';
+            e.target.style.color = opt.color;
           }}
         >
           {opt.label}
@@ -179,6 +164,7 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
   const [checklist, setChecklist] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false); // NOVO ESTADO: Controla o feedback visual
   
   const [openSections, setOpenSections] = useState<any>({ 
     geral: true, bi: false, cm: false, ae: false, ma: false, 
@@ -214,15 +200,13 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
     }
   }
 
-  // Função de atualização robusta (Imutabilidade garantida para não travar inputs)
-  const updateField = (field: string, value: any) => {
+  const updateField = useCallback((field: string, value: any) => {
     setChecklist((prev: any) => {
-      if (prev && prev[field] === value) return prev;
+      if (prev && prev[field] === value) return prev; 
       return { ...prev, [field]: value };
     });
-  };
+  }, []);
 
-  // Função para anexar texto sem apagar o que já foi digitado
   const appendText = (field: string, text: string) => {
     const currentVal = checklist[field] || '';
     const newVal = currentVal.trim().length > 0 ? `${currentVal}\n${text}` : text;
@@ -233,7 +217,6 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
     if (saving) return;
     setSaving(true);
     try {
-      // 1. Atualiza Dados Gerais (Cabeçalho da Vistoria)
       const { error: errHeader } = await supabase.from('vistoria_previa_avcb').update({
         nome_edificacao: vistoria.nome_edificacao,
         endereco_edificacao: vistoria.endereco_edificacao,
@@ -248,8 +231,6 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
 
       if (errHeader) throw new Error("Erro ao salvar cabeçalho: " + errHeader.message);
 
-      // 2. Atualiza ou Cria o Checklist (UPSERT)
-      // Remove o ID para evitar conflitos de cache no Upsert
       const { id, ...dadosSemId } = checklist;
       const dadosChecklist = {
         ...dadosSemId,
@@ -259,14 +240,21 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
       const { data: savedChecklist, error: errChecklist } = await supabase
         .from('checklist_vistoria_avcb')
         .upsert(dadosChecklist, { onConflict: 'vistoria_previa_id' })
-        .select()
+        .select('id') // MÁGICA AQUI: Pede pro banco devolver SÓ o ID, para não sobrescrever o que vc está digitando.
         .single();
       
       if (errChecklist) throw new Error("Erro ao salvar checklist: " + errChecklist.message);
 
-      if (savedChecklist) setChecklist(savedChecklist);
+      // Se for a primeira vez que salva, grava o ID gerado internamente
+      if (savedChecklist && !checklist.id) {
+         setChecklist((prev: any) => ({ ...prev, id: savedChecklist.id }));
+      }
 
-      if (!silent) alert("✅ Dados salvos com sucesso!");
+      if (!silent) {
+        // FIM DO ALERT TRAVADO: Dispara um feedback visual suave
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000); 
+      }
     } catch (err: any) {
       console.error(err);
       alert("Erro ao salvar: " + err.message);
@@ -296,15 +284,20 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
       
       {/* HEADER FLUTUANTE */}
       <div style={headerActionStyle}>
-        <button onClick={onBack} style={btnBackStyle}>← Voltar</button>
+        <button onClick={onBack} disabled={saving} style={btnBackStyle}>← Voltar</button>
         <div style={{ flex: 1, textAlign: 'center', fontWeight: 'bold', color: '#1a3353' }}>
           {vistoria.nome_edificacao}
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={() => handleSave(false)} disabled={saving} style={btnSaveStyle}>
-            {saving ? 'Salvando...' : '💾 Salvar'}
+          {/* BOTÃO DE SALVAR INTELIGENTE */}
+          <button 
+            onClick={() => handleSave(false)} 
+            disabled={saving} 
+            style={saveSuccess ? { ...btnSaveStyle, backgroundColor: '#20c997' } : btnSaveStyle}
+          >
+            {saving ? '⏳ Salvando...' : saveSuccess ? '✅ Salvo!' : '💾 Salvar'}
           </button>
-          <button onClick={handleGerarRelatorio} style={btnWordStyle}>
+          <button onClick={handleGerarRelatorio} disabled={saving} style={btnWordStyle}>
             📄 Word
           </button>
         </div>
@@ -315,10 +308,10 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
       {/* --- SEÇÃO 1: DADOS GERAIS --- */}
       <Section title="1. Informações Gerais" isOpen={openSections.geral} onToggle={() => toggleSection('geral')}>
         <div style={gridStyle}>
-            <TextRow label="Nome Edificação" value={vistoria.nome_edificacao} disabled={saving} onChange={(v: any) => setVistoria({ ...vistoria, nome_edificacao: v })} />
-            <TextRow label="Endereço" value={vistoria.endereco_edificacao} disabled={saving} onChange={(v: any) => setVistoria({ ...vistoria, endereco_edificacao: v })} />
-            <TextRow label="Pavimentos" type="number" value={vistoria.qtd_pavimentos} disabled={saving} onChange={(v: any) => setVistoria({ ...vistoria, qtd_pavimentos: v })} />
-            <TextRow label="Subsolos" type="number" value={vistoria.qtd_subsolos} disabled={saving} onChange={(v: any) => setVistoria({ ...vistoria, qtd_subsolos: v })} />
+            <TextRow label="Nome Edificação" value={vistoria.nome_edificacao} onChange={(v: any) => setVistoria({ ...vistoria, nome_edificacao: v })} />
+            <TextRow label="Endereço" value={vistoria.endereco_edificacao} onChange={(v: any) => setVistoria({ ...vistoria, endereco_edificacao: v })} />
+            <TextRow label="Pavimentos" type="number" value={vistoria.qtd_pavimentos} onChange={(v: any) => setVistoria({ ...vistoria, qtd_pavimentos: v })} />
+            <TextRow label="Subsolos" type="number" value={vistoria.qtd_subsolos} onChange={(v: any) => setVistoria({ ...vistoria, qtd_subsolos: v })} />
             
             <OptionsRow 
               label="Tipo de Edificação" 
@@ -327,9 +320,9 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
               options={[{ label: 'Residencial', value: 'Residencial' }, { label: 'Comercial', value: 'Comercial' }, { label: 'Misto', value: 'Misto' }]} 
             />
 
-            <TextRow label="Acompanhante" value={vistoria.nome_pessoa_acompanhou} disabled={saving} onChange={(v: any) => setVistoria({ ...vistoria, nome_pessoa_acompanhou: v })} />
-            <TextRow label="Cargo" value={vistoria.cargo_pessoa_acompanhou} disabled={saving}  onChange={(v: any) => setVistoria({ ...vistoria, cargo_pessoa_acompanhou: v })} />
-            <TextRow label="Telefone" value={vistoria.telefone_pessoa_acompanhou} disabled={saving} onChange={(v: any) => setVistoria({ ...vistoria, telefone_pessoa_acompanhou: v })} />
+            <TextRow label="Acompanhante" value={vistoria.nome_pessoa_acompanhou} onChange={(v: any) => setVistoria({ ...vistoria, nome_pessoa_acompanhou: v })} />
+            <TextRow label="Cargo" value={vistoria.cargo_pessoa_acompanhou} onChange={(v: any) => setVistoria({ ...vistoria, cargo_pessoa_acompanhou: v })} />
+            <TextRow label="Telefone" value={vistoria.telefone_pessoa_acompanhou} onChange={(v: any) => setVistoria({ ...vistoria, telefone_pessoa_acompanhou: v })} />
             
             <div style={{ gridColumn: 'span 2' }}>
               <BooleanRow 
@@ -379,8 +372,8 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
         
         <div style={{ marginTop: '15px' }}>
           <label style={labelStyle}>Parecer Técnico:</label>
-          <ParecerButtons disabled={saving} onSelect={(txt: string) => appendText('bi_parecer_texto', txt)} />
-          <textarea style={textareaStyle} placeholder="Nota sobre a Bomba..." value={checklist.bi_parecer_texto || ''} disabled={saving} onChange={e => updateField('bi_parecer_texto', e.target.value)} />
+          <ParecerButtons onSelect={(txt: string) => appendText('bi_parecer_texto', txt)} />
+          <textarea style={textareaStyle} placeholder="Nota sobre a Bomba..." value={checklist.bi_parecer_texto || ''} onChange={e => updateField('bi_parecer_texto', e.target.value)} />
         </div>
       </Section>
 
@@ -420,8 +413,8 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
         
         <div style={{ marginTop: '15px' }}>
           <label style={labelStyle}>Parecer Técnico:</label>
-          <ParecerButtons disabled={saving} onSelect={(txt: string) => appendText('cm_parecer_texto', txt)} />
-          <textarea style={textareaStyle} placeholder="Nota sobre Casa de Máquinas..." value={checklist.cm_parecer_texto || ''} disabled={saving} onChange={e => updateField('cm_parecer_texto', e.target.value)} />
+          <ParecerButtons onSelect={(txt: string) => appendText('cm_parecer_texto', txt)} />
+          <textarea style={textareaStyle} placeholder="Nota sobre Casa de Máquinas..." value={checklist.cm_parecer_texto || ''} onChange={e => updateField('cm_parecer_texto', e.target.value)} />
         </div>
       </Section>
 
@@ -429,7 +422,7 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
       <Section title="4. Andares / Escadarias" isOpen={openSections.ae} onToggle={() => toggleSection('ae')}>
         <BooleanRow label="Corrimão Contínuo?" field="ae_corrimão_continuo" value={checklist.ae_corrimão_continuo} onChange={updateField} />
         <BooleanRow label="Ambos os lados?" field="ae_corrimão_ambos_lados" value={checklist.ae_corrimão_ambos_lados} onChange={updateField} />
-        <TextRow label="Material" value={checklist.ae_material_corrimão} disabled={saving} onChange={( v:any) => updateField('ae_material_corrimão', v)} field="" />
+        <TextRow label="Material" value={checklist.ae_material_corrimão} onChange={( v:any) => updateField('ae_material_corrimão', v)} field="" />
         <BooleanRow label="Extremidades Parede?" field="ae_extremidades_parede" value={checklist.ae_extremidades_parede} onChange={updateField} />
         <BooleanRow label="Sinalizadas?" field="ae_escadarias_sinalizadas" value={checklist.ae_escadarias_sinalizadas} onChange={updateField} />
         <OptionsRow 
@@ -452,29 +445,29 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
         
         <div style={{ marginTop: '15px' }}>
           <label style={labelStyle}>Parecer Técnico:</label>
-          <ParecerButtons disabled={saving} onSelect={(txt: string) => appendText('ae_parecer_texto', txt)} />
-          <textarea style={textareaStyle} placeholder="Nota sobre Escadas..." value={checklist.ae_parecer_texto || ''} disabled={saving} onChange={e => updateField('ae_parecer_texto', e.target.value)} />
+          <ParecerButtons onSelect={(txt: string) => appendText('ae_parecer_texto', txt)} />
+          <textarea style={textareaStyle} placeholder="Nota sobre Escadas..." value={checklist.ae_parecer_texto || ''} onChange={e => updateField('ae_parecer_texto', e.target.value)} />
         </div>
       </Section>
 
       {/* --- SEÇÃO 5: MATERIAIS (MA) --- */}
       <Section title="5. Materiais de Acabamento" isOpen={openSections.ma} onToggle={() => toggleSection('ma')}>
-        <TextRow label="Escadaria/Hall" value={checklist.ma_escadaria_hall} disabled={saving} onChange={( v:any) => updateField('ma_escadaria_hall', v)} field="" />
-        <TextRow label="Piso" value={checklist.ma_piso} disabled={saving} onChange={( v:any) => updateField('ma_piso', v)} field="" />
-        <TextRow label="Parede" value={checklist.ma_parede} disabled={saving} onChange={( v:any) => updateField('ma_parede', v)} field="" />
-        <TextRow label="Teto" value={checklist.ma_teto} disabled={saving} onChange={( v:any) => updateField('ma_teto', v)} field="" />
+        <TextRow label="Escadaria/Hall" value={checklist.ma_escadaria_hall} onChange={( v:any) => updateField('ma_escadaria_hall', v)} field="" />
+        <TextRow label="Piso" value={checklist.ma_piso} onChange={( v:any) => updateField('ma_piso', v)} field="" />
+        <TextRow label="Parede" value={checklist.ma_parede} onChange={( v:any) => updateField('ma_parede', v)} field="" />
+        <TextRow label="Teto" value={checklist.ma_teto} onChange={( v:any) => updateField('ma_teto', v)} field="" />
         
         <div style={{ marginTop: '15px' }}>
           <label style={labelStyle}>Parecer Técnico:</label>
-          <ParecerButtons disabled={saving} onSelect={(txt: string) => appendText('ma_parecer_texto', txt)} />
-          <textarea style={textareaStyle} placeholder="Nota sobre Materiais..." value={checklist.ma_parecer_texto || ''} disabled={saving} onChange={e => updateField('ma_parecer_texto', e.target.value)} />
+          <ParecerButtons onSelect={(txt: string) => appendText('ma_parecer_texto', txt)} />
+          <textarea style={textareaStyle} placeholder="Nota sobre Materiais..." value={checklist.ma_parecer_texto || ''} onChange={e => updateField('ma_parecer_texto', e.target.value)} />
         </div>
       </Section>
 
       {/* --- SEÇÃO 6: PCF --- */}
       <Section title="6. Porta Corta Fogo" isOpen={openSections.pcf} onToggle={() => toggleSection('pcf')}>
         <BooleanRow label="Existem instaladas?" field="pcf_existem_instaladas" value={checklist.pcf_existem_instaladas} onChange={updateField} />
-        <TextRow label="Quantidade" type="number" value={checklist.pcf_quantas} disabled={saving} onChange={( v:any) => updateField('pcf_quantas', v)} field="" />
+        <TextRow label="Quantidade" type="number" value={checklist.pcf_quantas} onChange={( v:any) => updateField('pcf_quantas', v)} field="" />
         <OptionsRow 
           label="Modelo" 
           field="pcf_modelo" 
@@ -493,15 +486,15 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
         
         <div style={{ marginTop: '15px' }}>
           <label style={labelStyle}>Parecer Técnico:</label>
-          <ParecerButtons disabled={saving} onSelect={(txt: string) => appendText('pcf_parecer_texto', txt)} />
-          <textarea style={textareaStyle} placeholder="Nota sobre PCF..." value={checklist.pcf_parecer_texto || ''} disabled={saving} onChange={e => updateField('pcf_parecer_texto', e.target.value)} />
+          <ParecerButtons onSelect={(txt: string) => appendText('pcf_parecer_texto', txt)} />
+          <textarea style={textareaStyle} placeholder="Nota sobre PCF..." value={checklist.pcf_parecer_texto || ''} onChange={e => updateField('pcf_parecer_texto', e.target.value)} />
         </div>
       </Section>
 
       {/* --- SEÇÃO 7: EXTINTORES (EXT) --- */}
       <Section title="7. Extintores" isOpen={openSections.ext} onToggle={() => toggleSection('ext')}>
         <BooleanRow label="Dentro da Validade?" field="ext_dentro_validade" value={checklist.ext_dentro_validade} onChange={updateField} />
-        <TextRow label="Vencimento" type="date" value={checklist.ext_data_vencimento} disabled={saving} onChange={( v:any) => updateField('ext_data_vencimento', v)} field="" />
+        <TextRow label="Vencimento" type="date" value={checklist.ext_data_vencimento} onChange={( v:any) => updateField('ext_data_vencimento', v)} field="" />
         <BooleanRow label="Nec. Incluir Unidade?" field="ext_necessidade_incluir_unidade" value={checklist.ext_necessidade_incluir_unidade} onChange={updateField} />
         <BooleanRow label="Altura correta (IT-21)?" field="ext_altura_acordo_it21" value={checklist.ext_altura_acordo_it21} onChange={updateField} />
         <div style={{ padding: '10px 0' }}>
@@ -517,14 +510,14 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
         
         <div style={{ marginTop: '15px' }}>
           <label style={labelStyle}>Parecer Técnico:</label>
-          <ParecerButtons disabled={saving} onSelect={(txt: string) => appendText('ext_parecer_texto', txt)} />
-          <textarea style={textareaStyle} placeholder="Nota sobre Extintores..." value={checklist.ext_parecer_texto || ''} disabled={saving} onChange={e => updateField('ext_parecer_texto', e.target.value)} />
+          <ParecerButtons onSelect={(txt: string) => appendText('ext_parecer_texto', txt)} />
+          <textarea style={textareaStyle} placeholder="Nota sobre Extintores..." value={checklist.ext_parecer_texto || ''} onChange={e => updateField('ext_parecer_texto', e.target.value)} />
         </div>
       </Section>
 
       {/* --- SEÇÃO 8: HIDRANTES (HID) --- */}
       <Section title="8. Hidrantes" isOpen={openSections.hid} onToggle={() => toggleSection('hid')}>
-        <TextRow label="Quantidade" type="number" value={checklist.hid_quantos_existem} disabled={saving} onChange={( v:any) => updateField('hid_quantos_existem', v)} field="" />
+        <TextRow label="Quantidade" type="number" value={checklist.hid_quantos_existem} onChange={( v:any) => updateField('hid_quantos_existem', v)} field="" />
         <OptionsRow 
           label="Tipo Mangueira" 
           field="hid_tipo_mangueira" 
@@ -548,13 +541,13 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
         />
         <BooleanRow label="Chave Storz Completa?" field="hid_chave_storz_completas" value={checklist.hid_chave_storz_completas} onChange={updateField} />
         <BooleanRow label="Mangueira c/ Etiqueta?" field="hid_mangueira_etiqueta_teste" value={checklist.hid_mangueira_etiqueta_teste} onChange={updateField} />
-        <TextRow label="Vencimento Teste" type="date" value={checklist.hid_vencimento_teste} disabled={saving} onChange={( v:any) => updateField('hid_vencimento_teste', v)} field="" />
+        <TextRow label="Vencimento Teste" type="date" value={checklist.hid_vencimento_teste} onChange={( v:any) => updateField('hid_vencimento_teste', v)} field="" />
         <BooleanRow label="Necessidade Reparo?" field="hid_necessidade_reparo_substituicao" value={checklist.hid_necessidade_reparo_substituicao} onChange={updateField} />
         
         <div style={{ marginTop: '15px' }}>
           <label style={labelStyle}>Parecer Técnico:</label>
-          <ParecerButtons disabled={saving} onSelect={(txt: string) => appendText('hid_parecer_texto', txt)} />
-          <textarea style={textareaStyle} placeholder="Nota sobre Hidrantes..." value={checklist.hid_parecer_texto || ''} disabled={saving} onChange={e => updateField('hid_parecer_texto', e.target.value)} />
+          <ParecerButtons onSelect={(txt: string) => appendText('hid_parecer_texto', txt)} />
+          <textarea style={textareaStyle} placeholder="Nota sobre Hidrantes..." value={checklist.hid_parecer_texto || ''} onChange={e => updateField('hid_parecer_texto', e.target.value)} />
         </div>
       </Section>
 
@@ -573,12 +566,12 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
           ]} 
         />
         <BooleanRow label="Está Funcionando?" field="ie_esta_funcionando" value={checklist.ie_esta_funcionando} onChange={updateField} />
-        <TextRow label="Por quanto tempo?" value={checklist.ie_por_quanto_tempo} disabled={saving} onChange={( v:any) => updateField('ie_por_quanto_tempo', v)} field="" />
+        <TextRow label="Por quanto tempo?" value={checklist.ie_por_quanto_tempo} onChange={( v:any) => updateField('ie_por_quanto_tempo', v)} field="" />
         
         <div style={{ marginTop: '15px' }}>
           <label style={labelStyle}>Parecer Técnico:</label>
-          <ParecerButtons disabled={saving} onSelect={(txt: string) => appendText('ie_parecer_texto', txt)} />
-          <textarea style={textareaStyle} placeholder="Nota sobre Iluminação..." value={checklist.ie_parecer_texto || ''} disabled={saving} onChange={e => updateField('ie_parecer_texto', e.target.value)} />
+          <ParecerButtons onSelect={(txt: string) => appendText('ie_parecer_texto', txt)} />
+          <textarea style={textareaStyle} placeholder="Nota sobre Iluminação..." value={checklist.ie_parecer_texto || ''} onChange={e => updateField('ie_parecer_texto', e.target.value)} />
         </div>
       </Section>
 
@@ -589,8 +582,8 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
         
         <div style={{ marginTop: '15px' }}>
           <label style={labelStyle}>Parecer Técnico:</label>
-          <ParecerButtons disabled={saving} onSelect={(txt: string) => appendText('sh_parecer_texto', txt)} />
-          <textarea style={textareaStyle} placeholder="Nota sobre Shafts..." value={checklist.sh_parecer_texto || ''} disabled={saving} onChange={e => updateField('sh_parecer_texto', e.target.value)} />
+          <ParecerButtons onSelect={(txt: string) => appendText('sh_parecer_texto', txt)} />
+          <textarea style={textareaStyle} placeholder="Nota sobre Shafts..." value={checklist.sh_parecer_texto || ''} onChange={e => updateField('sh_parecer_texto', e.target.value)} />
         </div>
       </Section>
 
@@ -602,8 +595,8 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
         
         <div style={{ marginTop: '15px' }}>
           <label style={labelStyle}>Parecer Técnico:</label>
-          <ParecerButtons disabled={saving} onSelect={(txt: string) => appendText('sin_parecer_texto', txt)} />
-          <textarea style={textareaStyle} placeholder="Nota sobre Sinalização..." value={checklist.sin_parecer_texto || ''} disabled={saving} onChange={e => updateField('sin_parecer_texto', e.target.value)} />
+          <ParecerButtons onSelect={(txt: string) => appendText('sin_parecer_texto', txt)} />
+          <textarea style={textareaStyle} placeholder="Nota sobre Sinalização..." value={checklist.sin_parecer_texto || ''} onChange={e => updateField('sin_parecer_texto', e.target.value)} />
         </div>
       </Section>
 
@@ -619,8 +612,8 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
         
         <div style={{ marginTop: '15px' }}>
           <label style={labelStyle}>Parecer Técnico:</label>
-          <ParecerButtons disabled={saving} onSelect={(txt: string) => appendText('ca_parecer_texto', txt)} />
-          <textarea style={textareaStyle} placeholder="Nota sobre Alarme..." value={checklist.ca_parecer_texto || ''} disabled={saving} onChange={e => updateField('ca_parecer_texto', e.target.value)} />
+          <ParecerButtons onSelect={(txt: string) => appendText('ca_parecer_texto', txt)} />
+          <textarea style={textareaStyle} placeholder="Nota sobre Alarme..." value={checklist.ca_parecer_texto || ''} onChange={e => updateField('ca_parecer_texto', e.target.value)} />
         </div>
       </Section>
 
@@ -630,36 +623,36 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
         
         <div style={{ marginTop: '15px' }}>
           <label style={labelStyle}>Parecer Técnico:</label>
-          <ParecerButtons disabled={saving} onSelect={(txt: string) => appendText('rf_parecer_texto', txt)} />
-          <textarea style={textareaStyle} placeholder="Nota sobre Rota de Fuga..." value={checklist.rf_parecer_texto || ''} disabled={saving} onChange={e => updateField('rf_parecer_texto', e.target.value)} />
+          <ParecerButtons onSelect={(txt: string) => appendText('rf_parecer_texto', txt)} />
+          <textarea style={textareaStyle} placeholder="Nota sobre Rota de Fuga..." value={checklist.rf_parecer_texto || ''} onChange={e => updateField('rf_parecer_texto', e.target.value)} />
         </div>
       </Section>
 
       {/* --- SEÇÃO 14: CENTRAL DE MEDIÇÃO --- */}
       <Section title="14. Central de Medição" isOpen={openSections.cm_med} onToggle={() => toggleSection('cm_med')}>
-        <TextRow label="Tipo de Porta" value={checklist.cm_med_tipo_porta} disabled={saving} onChange={( v:any) => updateField('cm_med_tipo_porta', v)} field="" />
-        <TextRow label="Tipo de Extintor" value={checklist.cm_med_tipo_extintor} disabled={saving} onChange={( v:any) => updateField('cm_med_tipo_extintor', v)} field="" />
+        <TextRow label="Tipo de Porta" value={checklist.cm_med_tipo_porta} onChange={( v:any) => updateField('cm_med_tipo_porta', v)} field="" />
+        <TextRow label="Tipo de Extintor" value={checklist.cm_med_tipo_extintor} onChange={( v:any) => updateField('cm_med_tipo_extintor', v)} field="" />
         <BooleanRow label="Equip. Sinalizados?" field="cm_med_equipamentos_sinalizados" value={checklist.cm_med_equipamentos_sinalizados} onChange={updateField} />
         <BooleanRow label="Está Desobstruída?" field="cm_med_desobstruida" value={checklist.cm_med_desobstruida} onChange={updateField} />
         <BooleanRow label="Ilum. Emergência?" field="cm_med_possui_ilum_emerg" value={checklist.cm_med_possui_ilum_emerg} onChange={updateField} />
         
         <div style={{ marginTop: '15px' }}>
           <label style={labelStyle}>Parecer Técnico:</label>
-          <ParecerButtons disabled={saving} onSelect={(txt: string) => appendText('cm_med_parecer_texto', txt)} />
-          <textarea style={textareaStyle} placeholder="Nota sobre C. Medição..." value={checklist.cm_med_parecer_texto || ''} disabled={saving} onChange={e => updateField('cm_med_parecer_texto', e.target.value)} />
+          <ParecerButtons onSelect={(txt: string) => appendText('cm_med_parecer_texto', txt)} />
+          <textarea style={textareaStyle} placeholder="Nota sobre C. Medição..." value={checklist.cm_med_parecer_texto || ''} onChange={e => updateField('cm_med_parecer_texto', e.target.value)} />
         </div>
       </Section>
 
       {/* --- SEÇÃO 15: SISTEMAS INTEGRADOS --- */}
       <Section title="15. Interfone / Sistemas" isOpen={openSections.si} onToggle={() => toggleSection('si')}>
         <BooleanRow label="Vigilância 24h?" field="si_central_vigilancia_24h" value={checklist.si_central_vigilancia_24h} onChange={updateField} />
-        <TextRow label="Local Central" value={checklist.si_onde_instalada_central} disabled={saving} onChange={( v:any) => updateField('si_onde_instalada_central', v)} field="" />
+        <TextRow label="Local Central" value={checklist.si_onde_instalada_central} onChange={( v:any) => updateField('si_onde_instalada_central', v)} field="" />
         <BooleanRow label="Possui No-break/Gerador?" field="si_possui_no_break_bateria_gerador" value={checklist.si_possui_no_break_bateria_gerador} onChange={updateField} />
         
         <div style={{ marginTop: '15px' }}>
           <label style={labelStyle}>Parecer Técnico:</label>
-          <ParecerButtons disabled={saving} onSelect={(txt: string) => appendText('si_parecer_texto', txt)} />
-          <textarea style={textareaStyle} placeholder="Nota sobre Sistemas..." value={checklist.si_parecer_texto || ''} disabled={saving} onChange={e => updateField('si_parecer_texto', e.target.value)} />
+          <ParecerButtons onSelect={(txt: string) => appendText('si_parecer_texto', txt)} />
+          <textarea style={textareaStyle} placeholder="Nota sobre Sistemas..." value={checklist.si_parecer_texto || ''} onChange={e => updateField('si_parecer_texto', e.target.value)} />
         </div>
       </Section>
 
@@ -674,8 +667,8 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
         
         <div style={{ marginTop: '15px' }}>
           <label style={labelStyle}>Parecer Técnico:</label>
-          <ParecerButtons disabled={saving} onSelect={(txt: string) => appendText('sg_parecer_texto', txt)} />
-          <textarea style={textareaStyle} placeholder="Nota sobre Gás..." value={checklist.sg_parecer_texto || ''} disabled={saving} onChange={e => updateField('sg_parecer_texto', e.target.value)} />
+          <ParecerButtons onSelect={(txt: string) => appendText('sg_parecer_texto', txt)} />
+          <textarea style={textareaStyle} placeholder="Nota sobre Gás..." value={checklist.sg_parecer_texto || ''} onChange={e => updateField('sg_parecer_texto', e.target.value)} />
         </div>
       </Section>
 
@@ -698,8 +691,8 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
         
         <div style={{ marginTop: '15px' }}>
           <label style={labelStyle}>Parecer Técnico:</label>
-          <ParecerButtons disabled={saving} onSelect={(txt: string) => appendText('ger_parecer_texto', txt)} />
-          <textarea style={textareaStyle} placeholder="Nota sobre Gerador..." value={checklist.ger_parecer_texto || ''} disabled={saving} onChange={e => updateField('ger_parecer_texto', e.target.value)} />
+          <ParecerButtons onSelect={(txt: string) => appendText('ger_parecer_texto', txt)} />
+          <textarea style={textareaStyle} placeholder="Nota sobre Gerador..." value={checklist.ger_parecer_texto || ''} onChange={e => updateField('ger_parecer_texto', e.target.value)} />
         </div>
       </Section>
 
@@ -714,39 +707,38 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
         
         <div style={{ marginTop: '15px' }}>
           <label style={labelStyle}>Parecer Técnico:</label>
-          <ParecerButtons disabled={saving} onSelect={(txt: string) => appendText('sp_parecer_texto', txt)} />
-          <textarea style={textareaStyle} placeholder="Nota sobre Pressurização..." value={checklist.sp_parecer_texto || ''} disabled={saving} onChange={e => updateField('sp_parecer_texto', e.target.value)} />
+          <ParecerButtons onSelect={(txt: string) => appendText('sp_parecer_texto', txt)} />
+          <textarea style={textareaStyle} placeholder="Nota sobre Pressurização..." value={checklist.sp_parecer_texto || ''} onChange={e => updateField('sp_parecer_texto', e.target.value)} />
         </div>
       </Section>
 
       {/* --- SEÇÃO 19: REGISTRO DE RECALQUE --- */}
       <Section title="19. Registro de Recalque" isOpen={openSections.rr} onToggle={() => toggleSection('rr')}>
-        <TextRow label="Quantidade" type="number" value={checklist.rr_quantidade_existente} disabled={saving} onChange={( v:any) => updateField('rr_quantidade_existente', v)} field="" />
+        <TextRow label="Quantidade" type="number" value={checklist.rr_quantidade_existente} onChange={( v:any) => updateField('rr_quantidade_existente', v)} field="" />
         <BooleanRow label="Está Emperrado?" field="rr_esta_emperrado" value={checklist.rr_esta_emperrado} onChange={updateField} />
         <BooleanRow label="Nec. Pintura?" field="rr_necessidade_pintura_sinalizacao" value={checklist.rr_necessidade_pintura_sinalizacao} onChange={updateField} />
         <BooleanRow label="Nec. Tampão?" field="rr_necessidade_tampao_2_5" value={checklist.rr_necessidade_tampao_2_5} onChange={updateField} />
         <BooleanRow label="Nec. Adaptador?" field="rr_necessidade_adaptador_2_5" value={checklist.rr_necessidade_adaptador_2_5} onChange={updateField} />
         <BooleanRow label="Brita no Fundo?" field="rr_possui_brita_fundo" value={checklist.rr_possui_brita_fundo} onChange={updateField} />
         <BooleanRow label="Outro Reparo?" field="rr_outro_reparo" value={checklist.rr_outro_reparo} onChange={updateField} />
-        <TextRow label="Qual Reparo?" value={checklist.rr_qual_reparo} disabled={saving} onChange={( v:any) => updateField('rr_qual_reparo', v)} field="" />
+        <TextRow label="Qual Reparo?" value={checklist.rr_qual_reparo} onChange={( v:any) => updateField('rr_qual_reparo', v)} field="" />
         
         <div style={{ marginTop: '15px' }}>
           <label style={labelStyle}>Parecer Técnico:</label>
-          <ParecerButtons disabled={saving} onSelect={(txt: string) => appendText('rr_parecer_texto', txt)} />
-          <textarea style={textareaStyle} placeholder="Nota sobre Registro de Recalque..." value={checklist.rr_parecer_texto || ''} disabled={saving} onChange={e => updateField('rr_parecer_texto', e.target.value)} />
+          <ParecerButtons onSelect={(txt: string) => appendText('rr_parecer_texto', txt)} />
+          <textarea style={textareaStyle} placeholder="Nota sobre Registro de Recalque..." value={checklist.rr_parecer_texto || ''} onChange={e => updateField('rr_parecer_texto', e.target.value)} />
         </div>
       </Section>
 
       {/* --- CONCLUSÃO --- */}
       <Section title="Conclusão Final" isOpen={openSections.conclusao} onToggle={() => toggleSection('conclusao')}>
          <div style={{ marginBottom: '10px', fontSize: '13px', color: '#666', fontWeight: '600' }}>Opções Rápidas de Conclusão:</div>
-         <ConclusaoButtons disabled={saving} onSelect={(txt: string) => appendText('conclusao_texto', txt)} />
+         <ConclusaoButtons onSelect={(txt: string) => appendText('conclusao_texto', txt)} />
          
          <textarea 
             style={{ ...textareaStyle, height: '150px' }} 
             placeholder="Conclusão geral do relatório..."
             value={checklist.conclusao_texto || ''} 
-            disabled={saving}
             onChange={e => updateField('conclusao_texto', e.target.value)} 
          />
       </Section>
@@ -759,11 +751,11 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
 const headerActionStyle = { position: 'fixed' as 'fixed', top: 0, left: 0, right: 0, height: '60px', background: 'white', borderBottom: '1px solid #ddd', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', zIndex: 100, boxShadow: '0 2px 5px rgba(0,0,0,0.1)' };
 const rowStyle = { marginBottom: '15px', borderBottom: '1px solid #f9f9f9', paddingBottom: '10px' };
 const labelStyle = { fontSize: '13px', fontWeight: '600', color: '#444', display: 'block', marginBottom: '5px' };
-const radioLabelStyle = { cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', background: '#f8f9fa', padding: '5px 10px', borderRadius: '4px', border: '1px solid #eee' };
+const radioLabelStyle = { display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', background: '#f8f9fa', padding: '5px 10px', borderRadius: '4px', border: '1px solid #eee', cursor: 'pointer' };
 const fullWidthInputStyle = { width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '14px', boxSizing: 'border-box' as 'border-box' };
 const miniInputStyle = { width: '100%', padding: '6px', fontSize: '12px', border: '1px solid #eee', borderRadius: '4px', marginTop: '5px', boxSizing: 'border-box' as 'border-box', background: '#fffef0' };
 const textareaStyle = { width: '100%', padding: '10px', border: '1px solid #ccc', borderRadius: '4px', minHeight: '80px', fontFamily: 'inherit', fontSize: '14px', marginTop: '10px', boxSizing: 'border-box' as 'border-box' };
 const gridStyle = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' };
 const btnBackStyle = { background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', color: '#1a3353' };
-const btnSaveStyle = { background: '#28a745', color: 'white', padding: '8px 16px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' };
+const btnSaveStyle = { background: '#28a745', color: 'white', padding: '8px 16px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', transition: 'background-color 0.3s' };
 const btnWordStyle = { background: '#1a3353', color: 'white', padding: '8px 16px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' };
