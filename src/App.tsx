@@ -1,3 +1,4 @@
+//src\App.tsx
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
 import { Login } from './components/Login'
@@ -21,7 +22,8 @@ function App() {
   const [clienteParaEmissao, setClienteParaEmissao] = useState<any | null>(null)
   const [clienteAtivo, setClienteAtivo] = useState<any | null>(null)
 
-  const [novoCliente, setNovoCliente] = useState({ nome: '', cnpj_cpf: '', parceiro_id: '' })
+  // ESTADO ATUALIZADO COM O CAMPO ENDEREÇO
+  const [novoCliente, setNovoCliente] = useState({ nome: '', cnpj_cpf: '', parceiro_id: '', endereco: '' })
 
   async function fetchData() {
     setLoading(true)
@@ -40,35 +42,37 @@ function App() {
     }
   }
 
- // Substitua sua função handleCadastrarCliente por esta:
-const handleCadastrarCliente = async () => {
-  if (!novoCliente.nome || !novoCliente.cnpj_cpf) {
-    return alert("Nome e CNPJ/CPF são obrigatórios.");
-  }
+  // FUNÇÃO DE CADASTRO ATUALIZADA
+  const handleCadastrarCliente = async () => {
+    if (!novoCliente.nome || !novoCliente.cnpj_cpf) {
+      return alert("Nome e CNPJ/CPF são obrigatórios.");
+    }
 
-  setLoading(true); // Trava os botões para evitar duplo clique
-  try {
-    const { error } = await supabase
-      .from('clientes')
-      .insert([{
-        nome: novoCliente.nome.toUpperCase(),
-        cnpj_cpf: novoCliente.cnpj_cpf.replace(/\D/g, ''),
-        parceiro_id: novoCliente.parceiro_id || null,
-      }]);
+    setLoading(true); // Trava os botões para evitar duplo clique
+    try {
+      const { error } = await supabase
+        .from('clientes')
+        .insert([{
+          nome: novoCliente.nome.toUpperCase(),
+          cnpj_cpf: novoCliente.cnpj_cpf.replace(/\D/g, ''),
+          endereco: novoCliente.endereco, // NOVO CAMPO SALVO NO BANCO
+          parceiro_id: novoCliente.parceiro_id || null,
+        }]);
 
-    if (error) throw error;
+      if (error) throw error;
 
-    alert("✅ Cliente cadastrado com sucesso!");
-    setNovoCliente({ nome: '', cnpj_cpf: '', parceiro_id: '' });
-    
-    // Resetamos o loading ANTES de buscar os novos dados para liberar a UI
-    setLoading(false); 
-    await fetchData(); 
-  } catch (err: any) {
-    setLoading(false);
-    alert("❌ Erro ao cadastrar: " + (err.message || "Verifique os dados"));
-  }
-};
+      alert("✅ Cliente cadastrado com sucesso!");
+      // RESET ATUALIZADO
+      setNovoCliente({ nome: '', cnpj_cpf: '', parceiro_id: '', endereco: '' });
+      
+      // Resetamos o loading ANTES de buscar os novos dados para liberar a UI
+      setLoading(false); 
+      await fetchData(); 
+    } catch (err: any) {
+      setLoading(false);
+      alert("❌ Erro ao cadastrar: " + (err.message || "Verifique os dados"));
+    }
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -165,13 +169,18 @@ const handleCadastrarCliente = async () => {
           <>
             <section style={formSectionStyle}>
               <h3>➕ Novo Cadastro</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '15px', alignItems: 'end' }}>
+              {/* GRID ATUALIZADA PARA INCLUIR ENDEREÇO (5 COLUNAS) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 2fr auto', gap: '15px', alignItems: 'end' }}>
                 <input placeholder="Nome/Condomínio" style={inputStyle} value={novoCliente.nome} onChange={e => setNovoCliente({ ...novoCliente, nome: e.target.value })} />
                 <input placeholder="CPF/CNPJ" style={inputStyle} value={novoCliente.cnpj_cpf} onChange={e => setNovoCliente({ ...novoCliente, cnpj_cpf: e.target.value })} />
                 <select style={inputStyle} value={novoCliente.parceiro_id} onChange={e => setNovoCliente({ ...novoCliente, parceiro_id: e.target.value })}>
                   <option value="">Atendimento Direto</option>
                   {parceiros.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
                 </select>
+                
+                {/* NOVO CAMPO DE ENDEREÇO */}
+                <input placeholder="Endereço (Opcional)" style={inputStyle} value={novoCliente.endereco} onChange={e => setNovoCliente({ ...novoCliente, endereco: e.target.value })} />
+                
                 <button onClick={handleCadastrarCliente} style={btnGreenStyle} disabled={loading}>
             {loading ? 'Processando...' : 'Cadastrar'}
           </button>
