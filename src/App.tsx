@@ -7,8 +7,9 @@ import { ModalEmissao } from './components/ModalEmissao'
 import { Visao360 } from './components/Visao360'
 import { Dashboard } from './components/Dashboard'
 import { InboxGeral } from './components/InboxGeral' // Importe o novo componente
+import { GerenciadorPrecos } from './components/GerenciadorPrecos'
 
-type Pagina = 'dashboard' | 'clientes' | 'inbox' | 'config';
+type Pagina = 'dashboard' | 'clientes' | 'inbox' | 'precos' | 'config';
 
 function App() {
   const [session, setSession] = useState<any>(null)
@@ -150,6 +151,7 @@ function App() {
         <button onClick={() => setView('inbox')} style={view === 'inbox' ? activeTabStyle : tabStyle}>
           📥 Inbox {contagemPendentes > 0 && <span style={badgeStyle}>{contagemPendentes}</span>}
         </button>
+        <button onClick={() => setView('precos')} style={view === 'precos' ? activeTabStyle : tabStyle}>💰 Preços</button>
         <button onClick={() => setView('config')} style={view === 'config' ? activeTabStyle : tabStyle}>⚙️ Config</button>
 
         <button onClick={() => supabase.auth.signOut()} style={btnSairStyle}>Sair</button>
@@ -162,6 +164,8 @@ function App() {
         }} />}
 
         {view === 'inbox' && <InboxGeral onVincular={fetchData} />}
+
+        {view === 'precos' && <GerenciadorPrecos />}
 
         {view === 'config' && <Configuracoes onBack={() => setView('dashboard')} />}
 
