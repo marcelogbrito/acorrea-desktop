@@ -16,6 +16,7 @@ const LISTA_LAUDOS = [
   { id: 'gas', nome: 'Instalações de Gás', arquivo: 'modelo_laudo_gas.docx' },
   { id: 'equipamentos', nome: 'Equipamentos de Segurança', arquivo: 'modelo_laudo_equipamentos_seguranca.docx' },
   { id: 'cmar', nome: 'CMAR', arquivo: 'modelo_laudo_CMAR.docx' },
+  { id: 'gerador', nome: 'Grupo Motogerador', arquivo: 'modelo_laudo_grupo_motogerador.docx' },
 ];
 
 export function ModalGeradorLaudos({ cliente, onClose }: ModalProps) {

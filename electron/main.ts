@@ -1,3 +1,4 @@
+//electron/main.ts
 import { app, BrowserWindow, ipcMain, safeStorage, dialog, shell } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,12 +37,10 @@ let win: BrowserWindow | null = null;
 
 async function garantirNavegador() {
   try {
-    // Tenta validar se o Chrome está disponível (canal mais estável para usuários finais)
     await chromium.launch({ channel: 'chrome' }).then(b => b.close());
     return 'chrome';
   } catch (e) {
     try {
-      // Fallback: Tenta baixar o Chromium silenciosamente se não houver Chrome
       console.log("Instalando dependências de navegação...");
       execSync('npx playwright install chromium');
       return undefined; 
@@ -54,8 +53,8 @@ async function garantirNavegador() {
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1400, // Aumente o padrão inicial
-  height: 900,
+    width: 1400,
+    height: 900,
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       nodeIntegration: false,
@@ -152,24 +151,20 @@ ipcMain.handle('executar-robo-ginfes', async (_, credentials) => {
     const page = await browser.newPage();
     await page.goto('https://santoandre.ginfes.com.br/', { waitUntil: 'networkidle' });
 
-    // Fecha popup inicial
     const okButton = page.getByRole('button', { name: 'OK' });
     try { await okButton.waitFor({ state: 'visible', timeout: 3000 }); await okButton.click(); } catch (e) {}
 
-    // Login
     await page.click('img[alt="Acesso Exclusivo Prestador"]');
     await page.locator('input[type="text"]:visible').first().fill(usuario);
     await page.locator('input[type="password"]:visible').first().fill(senhaReal);
     await page.locator('.x-btn:has-text("Entrar")').first().click();
 
-    // Navega para Emissão
     const btnEmitir = page.locator('div.gwt-PushButton:has(img[src*="icon_nfse3.gif"])').first();
     await btnEmitir.waitFor({ state: 'visible' });
     await btnEmitir.click();
 
     await page.waitForTimeout(2000);
     
-    // Identifica frame do CNPJ
     let cnpjInput = null;
     for (const frame of page.frames()) {
       const el = frame.locator('input[name*="cnpj"]:visible').first();
@@ -186,7 +181,6 @@ ipcMain.handle('executar-robo-ginfes', async (_, credentials) => {
     await btnProx.waitFor({ state: 'visible' });
     await btnProx.click();
 
-    // Serviço e Valores
     await page.locator('input.cbTextAlign:visible').first().click();
     await page.locator('.x-combo-list-item:has-text("17.02")').first().click();
     await page.locator('textarea.x-form-textarea:visible').fill(descricaoServico || '');
@@ -194,7 +188,7 @@ ipcMain.handle('executar-robo-ginfes', async (_, credentials) => {
     const vInput = page.locator('input.alinhaValores:visible').first();
     await vInput.click({ clickCount: 3 }); 
     await vInput.press('Backspace');
-    await vInput.fill(valorNota); // Formato esperado pelo site (ex: 1.500,00)
+    await vInput.fill(valorNota); 
     await vInput.dispatchEvent('blur');
 
     return "✅ Robô concluiu o preenchimento! Revise os dados e clique em 'Emitir'.";
@@ -266,40 +260,80 @@ ipcMain.handle('gerar-relatorio-vistoria-previa', async (_, { vistoriaId }) => {
   return { success: true };
 });
 
+// ==========================================
+// MÁQUINA DE GERAÇÃO DE PROPOSTAS COMERCIAIS
+// ==========================================
 ipcMain.handle('gerar-proposta-assessoria-laudos', async (_, dadosExportacao) => {
   try {
-    const templatePath = app.isPackaged 
-      ? path.join(process.resourcesPath, 'templates', 'modelo_proposta_assessoria_laudos.docx') 
-      : path.join(__dirname, '..', 'resources', 'templates', 'modelo_proposta_assessoria_laudos.docx');
+    // 1. Roteador de Templates (Identifica o Word correto baseado na escolha do React)
+    let templateFileName = 'modelo_proposta_assessoria_laudos.docx';
 
+    switch (dadosExportacao.titulo_proposta) {
+      case "Proposta Adequações: Sinalização de Emergência":
+        templateFileName = 'modelo_proposta_adequacoes_sinalizacao.docx';
+        break;
+      case "Proposta Adequações: Central de Alarme":
+        templateFileName = 'modelo_proposta_adequacoes_central_alarme.docx';
+        break;
+      case "Proposta Adequações: Registro de Recalque":
+        templateFileName = 'modelo_proposta_adequacoes_registro_recalque.docx';
+        break;
+      case "Proposta Adequações: Iluminação de Emergência":
+        templateFileName = 'modelo_proposta_adequacoes_iluminacao.docx'; // Crie este arquivo depois
+        break;
+      case "Proposta Adequações: Bomba de Incêndio":
+        templateFileName = 'modelo_proposta_adequacoes_bomba.docx'; // Crie este arquivo depois
+        break;
+    }
+
+    const templatePath = app.isPackaged 
+      ? path.join(process.resourcesPath, 'templates', templateFileName) 
+      : path.join(__dirname, '..', 'resources', 'templates', templateFileName);
+
+    // 2. Injeta Data por Extenso para os Templates (ex: 16 de março de 2026)
+    const dataFormatada = new Date().toLocaleDateString('pt-BR', {
+      day: 'numeric', month: 'long', year: 'numeric'
+    });
+    dadosExportacao.data_extenso = dataFormatada;
+
+    // 3. Garante compatibilidade do Endereço (com ç) exigido nos novos modelos PDF
+    if (dadosExportacao.endereco_cliente) {
+      dadosExportacao.endereço_cliente = dadosExportacao.endereco_cliente;
+    }
+
+    // 4. Configura o Nome do Arquivo de Saída
     const nomeAmigavel = dadosExportacao.nome_cliente.replace(/[^a-z0-9]/gi, '_');
-    const nomeArquivo = `Proposta_Assessoria_Laudos_${nomeAmigavel}_${Date.now()}.docx`;
+    const prefixo = templateFileName.replace('.docx', '').replace('modelo_', '');
+    const nomeArquivo = `${prefixo}_${nomeAmigavel}_${Date.now()}.docx`;
     const outputPath = path.join(app.getPath('downloads'), nomeArquivo);
 
+    // 5. Envia para o Worker (docxtemplater)
     await gerarPropostaAssessoriaLaudos(dadosExportacao, templatePath, outputPath);
 
-    shell.openPath(outputPath); // Abre o Word para o usuário revisar
+    // 6. Abre o Word gerado
+    shell.openPath(outputPath); 
     return { success: true };
   } catch (err: any) {
-    console.error("Erro na Proposta:", err);
+    console.error("Erro na Geração da Proposta:", err);
     throw err;
   }
 });
 
+// ==========================================
+// MÁQUINA DE GERAÇÃO DE LAUDOS (EM LOTE)
+// ==========================================
 ipcMain.handle('gerar-laudos-lote', async (_, payload) => {
   const { cliente, laudosSelecionados, nr_rrt } = payload;
 
   try {
-    // Formata a data (Ex: 22 de fevereiro de 2026)
     const dataFormatada = new Date().toLocaleDateString('pt-BR', {
       day: 'numeric', month: 'long', year: 'numeric'
     });
 
-    // Mapeia as variáveis que existem nos documentos
     const dadosTemplate = {
       nome_cliente: String(cliente.nome).toUpperCase(),
       endereco_cliente: String(cliente.endereco).toUpperCase(),
-      endereço_cliente: String(cliente.endereco).toUpperCase(), // Mapeado com 'ç' como redundância para evitar erros no Word
+      endereço_cliente: String(cliente.endereco).toUpperCase(), 
       data_extenso: dataFormatada,
       nr_rrt: nr_rrt || 'NÃO INFORMADO'
     };
@@ -307,7 +341,6 @@ ipcMain.handle('gerar-laudos-lote', async (_, payload) => {
     const arquivosGerados = [];
     const nomeAmigavel = cliente.nome.replace(/[^a-z0-9]/gi, '_');
 
-    // Gera um arquivo para cada laudo selecionado
     for (const laudo of laudosSelecionados) {
       const templatePath = app.isPackaged 
         ? path.join(process.resourcesPath, 'templates', laudo.arquivo) 
@@ -320,7 +353,6 @@ ipcMain.handle('gerar-laudos-lote', async (_, payload) => {
       arquivosGerados.push(outputPath);
     }
 
-    // Abre a pasta de downloads com os arquivos selecionados
     if (arquivosGerados.length > 0) {
       shell.showItemInFolder(arquivosGerados[0]);
     }
@@ -353,3 +385,39 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+
+// preload.ts (Simulado aqui para contexto estrutural)
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('acorreaAPI', {
+    executarPyCad: (payload: any) => ipcRenderer.invoke('executar-pycad', payload),
+    abrirGinfes: (credentials: any) => ipcRenderer.invoke('executar-robo-ginfes', credentials),
+    encryptPassword: (password: string) => ipcRenderer.invoke('encrypt-password', password),
+    selecionarArquivo: (options: any) => ipcRenderer.invoke('selecionar-arquivo', options),
+    abrirArquivoLocal: (caminho: string) => ipcRenderer.invoke('abrir-arquivo-local', caminho),
+    gerarRelatorioVistoriaPrevia: (dados: any) => ipcRenderer.invoke('gerar-relatorio-vistoria-previa', dados),
+    gerarPropostaAssessoriaLaudos: (dados: any) => ipcRenderer.invoke('gerar-proposta-assessoria-laudos', dados),
+    gerarLaudosLote: (payload: any) => ipcRenderer.invoke('gerar-laudos-lote', payload),
+
+    sincronizarEmails: () => ipcRenderer.invoke('forcar-sincronizacao'),
+    onWhatsAppQR: (callback: (qr: string) => void) => {
+      const listener = (_event: any, qr: string) => callback(qr);
+      ipcRenderer.on('whatsapp-qr', listener);
+      return () => ipcRenderer.removeListener('whatsapp-qr', listener);
+    },
+    onInboxProgresso: (callback: any) => {
+      const listener = (_event: any, value: any) => callback(value);
+      ipcRenderer.on('inbox-progresso', listener);
+      return () => ipcRenderer.removeListener('inbox-progresso', listener);
+    },
+    onInboxLog: (callback: any) => {
+      const listener = (_event: any, msg: string) => callback(msg);
+      ipcRenderer.on('inbox-log', listener);
+      return () => ipcRenderer.removeListener('inbox-log', listener);
+    },
+    onRefreshInbox: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on('refresh-inbox', listener);
+      return () => ipcRenderer.removeListener('refresh-inbox', listener);
+    },
+});
