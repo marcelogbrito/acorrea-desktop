@@ -5,7 +5,7 @@ import { FormularioCobranca } from './FormularioCobranca'
 import { GerenciamentoProjetos } from './GerenciamentoProjetos'
 import { NovaVistoriaModal } from './NovaVistoriaModal' 
 import { VistoriaDetalhes } from './VistoriaDetalhes' 
-import { ModalNovaProposta } from './ModalNovaProposta' // <-- IMPORTAÇÃO CORRIGIDA
+import { ModalNovaProposta } from './ModalNovaProposta' 
 import { ModalGeradorLaudos } from './ModalGeradorLaudos';
 
 interface Visao360Props {
@@ -15,7 +15,6 @@ interface Visao360Props {
 }
 
 export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props) {
-  // --- ESTADOS ---
   const [loading, setLoading] = useState(true)
   const [abaAtiva, setAbaAtiva] = useState<'geral' | 'projetos'>('geral')
   const [vistorias, setVistorias] = useState<any[]>([])
@@ -27,6 +26,7 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
   const [abrirNovaCobranca, setAbrirNovaCobranca] = useState(false)
   const [abrirNovaVistoria, setAbrirNovaVistoria] = useState(false)
   const [abrirNovaProposta, setAbrirNovaProposta] = useState(false) 
+  const [orcamentoEditando, setOrcamentoEditando] = useState<any>(null) // <-- NOVO: Controle de Edição
   const [vistoriaAbertaId, setVistoriaAbertaId] = useState<string | null>(null)
   
   const [subindoNotaId, setSubindoNotaId] = useState<string | null>(null)
@@ -40,7 +40,6 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
     setDadosCliente(cliente)
   }, [cliente.id])
 
-  // --- LÓGICA ---
   async function loadClienteData() {
     setLoading(true)
     try {
@@ -60,6 +59,22 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
       setLoading(false)
     }
   }
+
+  // --- FUNÇÕES DE EXCLUSÃO E EDIÇÃO DE PROPOSTAS ---
+  const excluirOrcamento = async (id: string) => {
+    if (!window.confirm("🗑️ Deseja realmente excluir esta proposta comercial permanentemente?")) return;
+    try {
+      const { error } = await supabase.from('orcamentos').delete().eq('id', id);
+      if (error) throw error;
+      loadClienteData();
+    } catch (err: any) { alert("Erro ao excluir: " + err.message); }
+  }
+
+  const abrirEdicaoProposta = (orcamento: any) => {
+    setOrcamentoEditando(orcamento);
+    setAbrirNovaProposta(true);
+  }
+  // ------------------------------------------------
 
   const excluirReceita = async (id: string) => {
     if (!window.confirm("🗑️ Deseja realmente excluir esta cobrança?")) return;
@@ -140,10 +155,7 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
       .update({ situacao_orcamento: novaSituacao })
       .eq('id', id);
     
-    if (error) {
-      alert("Erro ao atualizar situação: " + error.message);
-      return;
-    }
+    if (error) return alert("Erro ao atualizar situação: " + error.message);
 
     if (novaSituacao === 'Aprovado') {
       const confirmar = window.confirm("Orçamento aprovado! Gerar lembrete de agendamento de vistoria?");
@@ -177,7 +189,6 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
   return (
     <div style={containerStyle}>
       
-      {/* HEADER */}
       <div style={headerStyle}>
         <button onClick={onBack} style={btnBackStyle}>← Voltar para Lista</button>
         <h2 style={{ margin: 0 }}>🔍 Cliente: {dadosCliente.nome}</h2>
@@ -194,9 +205,7 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
       {abaAtiva === 'geral' ? (
         <div style={mainGridStyle}>
           
-          {/* COLUNA ESQUERDA */}
           <div style={columnStyle}>
-            {/* DADOS DO CLIENTE */}
             <section style={cardStyle}>
               <div style={cardHeaderStyle}>
                 <h3 style={{ margin: 0 }}>📋 Dados do Condomínio</h3>
@@ -225,7 +234,6 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
               </div>
             </section>
 
-            {/* FINANCEIRO */}
             <section style={cardStyle}>
               <div style={cardHeaderStyle}>
                 <h3 style={{ margin: 0 }}>💳 Contas a Receber</h3>
@@ -268,27 +276,23 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
             </section>
           </div>
 
-          {/* COLUNA DIREITA */}
           <div style={columnStyle}>
             
-            {/* SEÇÃO ORÇAMENTOS (NOVA) */}
+            {/* SEÇÃO ORÇAMENTOS ATUALIZADA (EDIÇÃO E EXCLUSÃO) */}
             <section style={cardStyle}>
               <div style={cardHeaderStyle}>
                 <h3 style={{ margin: 0 }}>📝 Propostas Comerciais</h3>
-                <button onClick={() => setAbrirNovaProposta(true)} style={btnGreenStyle}>+ Nova Proposta</button>
+                <button onClick={() => { setOrcamentoEditando(null); setAbrirNovaProposta(true); }} style={btnGreenStyle}>+ Nova Proposta</button>
               </div>
               {orcamentos.length === 0 ? (
                 <p style={{ fontSize: '12px', color: '#999', textAlign: 'center' }}>Nenhum orçamento gerado.</p>
               ) : (
                 orcamentos.map(orc => (
                   <div key={orc.id} style={itemStyle}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>
-                        {/* TÍTULO DINÂMICO AQUI */}
-                        <span style={{ fontWeight: 'bold', color: '#1a3353' }}>{orc.titulo || 'Proposta Assessoria e Laudos'}</span>
-                        <div style={{ fontSize: '11px', color: '#666' }}>
-                          Emitido em: {new Date(orc.data_envio).toLocaleDateString()}
-                        </div>
+                        <span style={{ fontWeight: 'bold', color: '#1a3353', display: 'block', marginBottom: '2px' }}>{orc.titulo || 'Proposta Assessoria e Laudos'}</span>
+                        <span style={{ fontSize: '11px', color: '#666' }}>Emitido em: {new Date(orc.data_envio).toLocaleDateString()}</span>
                       </div>
                       <select 
                         value={orc.situacao_orcamento} 
@@ -301,15 +305,18 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
                         <option value="Cancelado">🚫 Cancelado</option>
                       </select>
                     </div>
-                    <div style={{ marginTop: '5px', display: 'flex', justifyContent: 'space-between' }}>
-                      <strong>R$ {Number(orc.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+                    <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <strong style={{ color: '#28a745' }}>R$ {Number(orc.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+                      <div style={{ display: 'flex', gap: '5px' }}>
+                        <button onClick={() => abrirEdicaoProposta(orc)} style={btnViewStyle}>✏️ Editar / Gerar Word</button>
+                        <button onClick={() => excluirOrcamento(orc.id)} style={{...btnSmallStyle, color: '#dc3545'}}>🗑️</button>
+                      </div>
                     </div>
                   </div>
                 ))
               )}
             </section>
 
-            {/* SEÇÃO VISTORIAS */}
             <section style={cardStyle}>
               <div style={cardHeaderStyle}>
                 <h3 style={{ margin: 0 }}>🕵️ Vistorias Técnicas</h3>
@@ -326,7 +333,6 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
               ))}
             </section>
 
-            {/* SEÇÃO EMISSAO DE LAUDOS */}
             <section style={cardStyle}>
               <div style={cardHeaderStyle}>
                 <h3 style={{ margin: 0 }}>🖨️ Emissão de Laudos</h3>
@@ -335,7 +341,6 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
               <p style={{ fontSize: '12px', color: '#666' }}>Selecione e gere atestados e laudos técnicos em lote para este condomínio.</p>
             </section>
 
-            {/* SEÇÃO NOTAS FISCAIS */}
             <section style={cardStyle}>
               <h3 style={cardTitleStyle}>📄 Histórico de Notas Fiscais</h3>
               {notasFiscais.map(nf => (
@@ -360,7 +365,6 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
         <GerenciamentoProjetos clienteId={cliente.id} clienteNome={cliente.nome} />
       )}
 
-      {/* MODAIS: AQUI A CHAMADA DO MODAL DE PROPOSTA FOI CORRIGIDA */}
       {abrirNovaCobranca && (
         <FormularioCobranca clienteId={cliente.id} onCancelar={() => setAbrirNovaCobranca(false)} onSucesso={() => { setAbrirNovaCobranca(false); loadClienteData(); }} />
       )}
@@ -368,7 +372,15 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
         <NovaVistoriaModal clienteId={cliente.id} onClose={() => setAbrirNovaVistoria(false)} onSuccess={() => { setAbrirNovaVistoria(false); loadClienteData(); }} />
       )}
       {abrirNovaProposta && (
-        <ModalNovaProposta cliente={cliente} onClose={() => { setAbrirNovaProposta(false); loadClienteData(); }} />
+        <ModalNovaProposta 
+          cliente={cliente} 
+          orcamentoEditando={orcamentoEditando} // Passando os dados para edição
+          onClose={() => { 
+            setAbrirNovaProposta(false); 
+            setOrcamentoEditando(null); // Limpa o estado ao fechar
+            loadClienteData(); 
+          }} 
+        />
       )}
       {abrirGeradorLaudos && (
         <ModalGeradorLaudos cliente={cliente} onClose={() => setAbrirGeradorLaudos(false)} />
@@ -397,7 +409,7 @@ const activeSubTabStyle = { ...subTabStyle, borderBottom: '3px solid #1a3353', f
 const btnGreenStyle = { backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' as 'bold' };
 const btnNFStyle = { padding: '6px 12px', fontSize: '11px', backgroundColor: '#6f42c1', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' };
 const btnZapStyle = { padding: '6px 12px', fontSize: '11px', backgroundColor: '#25D366', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' };
-const btnViewStyle = { padding: '6px 12px', fontSize: '12px', backgroundColor: '#eef2f7', border: '1px solid #999', borderRadius: '3px', cursor: 'pointer' };
+const btnViewStyle = { padding: '6px 12px', fontSize: '12px', backgroundColor: '#eef2f7', border: '1px solid #999', borderRadius: '3px', cursor: 'pointer', fontWeight: 'bold' as 'bold' };
 const btnSmallStyle = { padding: '4px 8px', fontSize: '11px', backgroundColor: '#f8f9fa', border: '1px solid #ddd', borderRadius: '3px', cursor: 'pointer' };
 const btnUploadBoletoStyle = { padding: '6px 12px', backgroundColor: '#007bff', color: 'white', borderRadius: '3px', cursor: 'pointer', fontSize: '11px' };
 const btnUploadNotaStyle = { padding: '6px 12px', backgroundColor: '#28a745', color: 'white', borderRadius: '3px', cursor: 'pointer', fontSize: '11px' };
@@ -406,11 +418,4 @@ const btnOutlineStyle = { background: 'white', border: '1px solid #007bff', colo
 const miniLabelStyle = { fontSize: '11px', color: '#999', textTransform: 'uppercase' as 'uppercase', display: 'block', marginBottom: '2px' };
 const inputStaticStyle = { width: '100%', padding: '5px 0', border: 'none', background: 'transparent', fontWeight: 'bold' as 'bold', color: '#333', fontSize: '14px' };
 const inputEditableStyle = { width: '100%', padding: '8px', border: '1px solid #007bff', borderRadius: '6px', background: '#fff', fontSize: '14px', boxSizing: 'border-box' as 'border-box' };
-const selectStatusStyle: React.CSSProperties = {
-  padding: '4px',
-  borderRadius: '4px',
-  fontSize: '11px',
-  border: '1px solid #ccc',
-  backgroundColor: '#f8f9fa',
-  cursor: 'pointer'
-};
+const selectStatusStyle: React.CSSProperties = { padding: '4px', borderRadius: '4px', fontSize: '11px', border: '1px solid #ccc', backgroundColor: '#f8f9fa', cursor: 'pointer' };

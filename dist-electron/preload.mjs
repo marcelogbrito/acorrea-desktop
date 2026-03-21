@@ -1,1 +1,33 @@
-"use strict";const{contextBridge:i,ipcRenderer:r}=require("electron");i.exposeInMainWorld("acorreaAPI",{executarPyCad:e=>r.invoke("executar-pycad",e),abrirGinfes:e=>r.invoke("executar-robo-ginfes",e),encryptPassword:e=>r.invoke("encrypt-password",e),selecionarArquivo:e=>r.invoke("selecionar-arquivo",e),abrirArquivoLocal:e=>r.invoke("abrir-arquivo-local",e),gerarRelatorioVistoriaPrevia:e=>r.invoke("gerar-relatorio-vistoria-previa",e),gerarPropostaAssessoriaLaudos:e=>r.invoke("gerar-proposta-assessoria-laudos",e),gerarLaudosLote:e=>r.invoke("gerar-laudos-lote",e),sincronizarEmails:()=>r.invoke("forcar-sincronizacao"),onWhatsAppQR:e=>{const o=(s,n)=>e(n);return r.on("whatsapp-qr",o),()=>r.removeListener("whatsapp-qr",o)},onInboxProgresso:e=>{const o=(s,n)=>e(n);return r.on("inbox-progresso",o),()=>r.removeListener("inbox-progresso",o)},onInboxLog:e=>{const o=(s,n)=>e(n);return r.on("inbox-log",o),()=>r.removeListener("inbox-log",o)},onRefreshInbox:e=>{const o=()=>e();return r.on("refresh-inbox",o),()=>r.removeListener("refresh-inbox",o)}});
+"use strict";
+const electron = require("electron");
+electron.contextBridge.exposeInMainWorld("acorreaAPI", {
+  executarPyCad: (payload) => electron.ipcRenderer.invoke("executar-pycad", payload),
+  abrirGinfes: (credentials) => electron.ipcRenderer.invoke("executar-robo-ginfes", credentials),
+  encryptPassword: (password) => electron.ipcRenderer.invoke("encrypt-password", password),
+  selecionarArquivo: (options) => electron.ipcRenderer.invoke("selecionar-arquivo", options),
+  abrirArquivoLocal: (caminho) => electron.ipcRenderer.invoke("abrir-arquivo-local", caminho),
+  gerarRelatorioVistoriaPrevia: (dados) => electron.ipcRenderer.invoke("gerar-relatorio-vistoria-previa", dados),
+  gerarPropostaAssessoriaLaudos: (dados) => electron.ipcRenderer.invoke("gerar-proposta-assessoria-laudos", dados),
+  gerarLaudosLote: (payload) => electron.ipcRenderer.invoke("gerar-laudos-lote", payload),
+  sincronizarEmails: () => electron.ipcRenderer.invoke("forcar-sincronizacao"),
+  onWhatsAppQR: (callback) => {
+    const listener = (_event, qr) => callback(qr);
+    electron.ipcRenderer.on("whatsapp-qr", listener);
+    return () => electron.ipcRenderer.removeListener("whatsapp-qr", listener);
+  },
+  onInboxProgresso: (callback) => {
+    const listener = (_event, value) => callback(value);
+    electron.ipcRenderer.on("inbox-progresso", listener);
+    return () => electron.ipcRenderer.removeListener("inbox-progresso", listener);
+  },
+  onInboxLog: (callback) => {
+    const listener = (_event, msg) => callback(msg);
+    electron.ipcRenderer.on("inbox-log", listener);
+    return () => electron.ipcRenderer.removeListener("inbox-log", listener);
+  },
+  onRefreshInbox: (callback) => {
+    const listener = () => callback();
+    electron.ipcRenderer.on("refresh-inbox", listener);
+    return () => electron.ipcRenderer.removeListener("refresh-inbox", listener);
+  }
+});

@@ -1,3 +1,4 @@
+//automation\proposal_worker.ts
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import fs from 'fs';
@@ -47,10 +48,19 @@ function valorPorExtenso(valor: number): string {
   return resultado;
 }
 
-// Formata para o padrão exigido: "R$ 600,00 (seiscentos reais)"
-const formatarMoeda = (valor: number) => {
-  const formatado = valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return `R$ ${formatado} (${valorPorExtenso(valor)})`;
+// Formata para o padrão exigido: "R$ 600,00 (seiscentos reais)" COM TRAVA DE SEGURANÇA
+const formatarMoedaSegura = (valor: any) => {
+  if (valor === undefined || valor === null || valor === '') return '';
+  
+  let num = valor;
+  // Se o React enviar a string formatada em R$, extraímos apenas o número
+  if (typeof valor === 'string') {
+     num = parseFloat(valor.replace(/[^\d,-]/g, '').replace(',', '.'));
+     if (isNaN(num)) return valor; // Se não for número, devolve o texto puro
+  }
+
+  const formatado = num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `R$ ${formatado} (${valorPorExtenso(num)})`;
 };
 
 export async function gerarPropostaAssessoriaLaudos(
@@ -63,31 +73,44 @@ export async function gerarPropostaAssessoriaLaudos(
     day: 'numeric', month: 'long', year: 'numeric' 
   });
 
-  // Mapeamento exato das tags do seu arquivo Word
+  // Mapeamento das tags - Unindo tudo o que vem da tela (incluindo as listas)
   const dados = {
+    ...dadosTela, // <-- MÁGICA AQUI: Traz itens_sinalizacao, itens_alarme, etc., automaticamente
+    
     nome_cliente: dadosTela.nome_cliente ? String(dadosTela.nome_cliente).toUpperCase() : '',
-    endereço_cliente: dadosTela.endereco_cliente ? String(dadosTela.endereco_cliente).toUpperCase() : '',
+    endereco_cliente: dadosTela.endereco_cliente ? String(dadosTela.endereco_cliente).toUpperCase() : '',
+    endereço_cliente: dadosTela.endereco_cliente ? String(dadosTela.endereco_cliente).toUpperCase() : '', // Redundância para evitar erro com 'ç'
     cnpj_cliente: dadosTela.cnpj_cliente || '',
     data_extenso: dataFormatada,
     
-    // Valores formatados
-    preco_assessoria_avcb: formatarMoeda(dadosTela.preco_assessoria_avcb),
-    preco_sistema_incendio: formatarMoeda(dadosTela.preco_sistema_incendio),
-    preco_brigada: formatarMoeda(dadosTela.preco_brigada),
-    preco_atestado_gas: formatarMoeda(dadosTela.preco_atestado_gas),
-    preco_atestado_alarme: formatarMoeda(dadosTela.preco_atestado_alarme),
-    preco_atestado_pressurizacao: formatarMoeda(dadosTela.preco_atestado_pressurizacao),
-    preco_atestado_eletrica: formatarMoeda(dadosTela.preco_atestado_eletrica),
-    preco_atestado_cmar: formatarMoeda(dadosTela.preco_atestado_cmar),
-    preco_sistema_hidrantes: formatarMoeda(dadosTela.preco_sistema_hidrantes),
-    preco_atestado_shafts: formatarMoeda(dadosTela.preco_atestado_shafts),
-    preco_atestado_gerador: formatarMoeda(dadosTela.preco_atestado_gerador),
-    preco_total: formatarMoeda(dadosTela.preco_total),
+    // Valores formatados de forma segura (Mantendo a lógica da proposta antiga)
+    preco_assessoria_avcb: formatarMoedaSegura(dadosTela.preco_assessoria_avcb),
+    preco_sistema_incendio: formatarMoedaSegura(dadosTela.preco_sistema_incendio),
+    preco_brigada: formatarMoedaSegura(dadosTela.preco_brigada),
+    preco_atestado_gas: formatarMoedaSegura(dadosTela.preco_atestado_gas),
+    preco_atestado_alarme: formatarMoedaSegura(dadosTela.preco_atestado_alarme),
+    preco_atestado_pressurizacao: formatarMoedaSegura(dadosTela.preco_atestado_pressurizacao),
+    preco_atestado_eletrica: formatarMoedaSegura(dadosTela.preco_atestado_eletrica),
+    preco_atestado_cmar: formatarMoedaSegura(dadosTela.preco_atestado_cmar),
+    preco_sistema_hidrantes: formatarMoedaSegura(dadosTela.preco_sistema_hidrantes),
+    preco_atestado_shafts: formatarMoedaSegura(dadosTela.preco_atestado_shafts),
+    preco_atestado_gerador: formatarMoedaSegura(dadosTela.preco_atestado_gerador),
+    preco_total: formatarMoedaSegura(dadosTela.preco_total),
   };
 
   const content = fs.readFileSync(caminhoTemplate, 'binary');
   const zip = new PizZip(content);
-  const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+  
+  // MÁGICA 2: Configuração avançada do Docxtemplater
+  const doc = new Docxtemplater(zip, { 
+    paragraphLoop: true, 
+    linebreaks: true, // Garante que a lista de itens fique linha abaixo de linha
+    nullGetter(part) {
+      if (!part.module) return "";
+      if (part.module === "rawxml") return "";
+      return ""; // Se uma tag do word (ex: {itens_bomba}) não existir, fica em branco e não "undefined"
+    }
+  });
 
   try {
     doc.render(dados);
