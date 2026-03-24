@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 
 interface ModalProps {
   cliente: any;
-  orcamentoEditando?: any; // Recebe o orçamento para edição
+  orcamentoEditando?: any; 
   onClose: () => void;
 }
 
@@ -27,6 +27,7 @@ interface CategoriaItem {
 
 export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: ModalProps) {
   const [gerando, setGerando] = useState(false);
+  const [salvando, setSalvando] = useState(false);
   const [tipoSelecionado, setTipoSelecionado] = useState(TIPOS_PROPOSTA[0]);
   
   const [precos, setPrecos] = useState<any>({});
@@ -44,7 +45,6 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
     async function carregarPrecos() {
       const { data } = await supabase.from('tabela_precos').select('*').order('item_nome');
       
-      // Se estiver editando, busca o JSON salvo. Se for novo, usa um objeto vazio.
       const jsonSalvo = orcamentoEditando?.dados_json || {};
 
       if (data) {
@@ -66,7 +66,6 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
         data.forEach(item => {
           if (de_para[item.item_nome]) {
              const key = de_para[item.item_nome];
-             // Prioriza o valor salvo no JSON do orçamento. Se não existir, pega o atual da tabela de preços
              mapaServicos[key] = jsonSalvo.precos && jsonSalvo.precos[key] !== undefined 
                 ? jsonSalvo.precos[key] 
                 : Number(item.preco_venda);
@@ -78,7 +77,6 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
         const mapearCategoria = (categoriaNome: string, jsonKey: string) => data
           .filter(item => item.categoria === categoriaNome)
           .map(item => {
-            // Busca se o item já tem quantidade e preço salvos no JSON deste orçamento
             const itemSalvo = jsonSalvo[jsonKey]?.find((i: any) => i.id === item.id);
             return {
               id: item.id,
@@ -116,6 +114,52 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
     return 0;
   };
 
+  const getItensAtuais = (): CategoriaItem[] => {
+    if (tipoSelecionado === "Proposta Adequações: Sinalização de Emergência") return itensSinalizacao;
+    if (tipoSelecionado === "Proposta Adequações: Central de Alarme") return itensAlarme;
+    if (tipoSelecionado === "Proposta Adequações: Registro de Recalque") return itensRecalque;
+    if (tipoSelecionado === "Proposta Adequações: Iluminação de Emergência") return itensIluminacao;
+    if (tipoSelecionado === "Proposta Adequações: Bomba de Incêndio") return itensBomba;
+    return [];
+  };
+
+  const exportarParaExcel = () => {
+    const itensAtivos = getItensAtuais().filter(i => i.quantidade > 0);
+    
+    if (tipoSelecionado === "Proposta Assessoria AVCB e Laudos") {
+      return alert("A exportação para Excel está disponível apenas para as propostas de adequações (listas de materiais).");
+    }
+
+    if (itensAtivos.length === 0) {
+      return alert("Selecione a quantidade de pelo menos um item para exportar.");
+    }
+
+    const cabecalho = ['Item / Serviço', 'Quantidade', 'Unidade', 'Preço Unitário (R$)', 'Total (R$)'];
+    
+    const linhas = itensAtivos.map(item => [
+      `"${item.nome}"`,
+      item.quantidade,
+      `"${item.unidade}"`,
+      `"${item.preco.toFixed(2).replace('.', ',')}"`,
+      `"${(item.preco * item.quantidade).toFixed(2).replace('.', ',')}"`
+    ]);
+
+    // Linha final com o total
+    linhas.push(['"TOTAL GERAL"', '', '', '', `"${calcularTotal().toFixed(2).replace('.', ',')}"`]);
+
+    const csvContent = "\uFEFF" + [cabecalho.join(';'), ...linhas.map(l => l.join(';'))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    const nomeArquivoSafe = tipoSelecionado.replace(/[^a-z0-9]/gi, '_');
+    link.setAttribute('download', `Itens_${nomeArquivoSafe}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const formatarItensParaWord = (itens: CategoriaItem[]) => {
     const selecionados = itens.filter(i => i.quantidade > 0);
     if (selecionados.length === 0) return "Nenhum item adicionado à proposta.";
@@ -126,11 +170,9 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
     }).join('\n');
   };
 
-  const salvarEGerar = async () => {
-    setGerando(true);
+  // Função central para persistir os dados no banco
+  const salvarNoBanco = async () => {
     const valorTotal = calcularTotal();
-
-    // Cria o JSON com todos os dados da tela para salvar no banco
     const payloadJson = {
       precos,
       itensSinalizacao: itensSinalizacao.filter(i => i.quantidade > 0),
@@ -140,30 +182,48 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
       itensBomba: itensBomba.filter(i => i.quantidade > 0),
     };
 
+    const orcamentoPayload = {
+      cliente_id: cliente.id,
+      titulo: tipoSelecionado, 
+      valor: valorTotal,
+      data_envio: orcamentoEditando ? orcamentoEditando.data_envio : new Date().toISOString().split('T')[0],
+      situacao_orcamento: orcamentoEditando ? orcamentoEditando.situacao_orcamento : 'Aguardando',
+      validade_dias: 20,
+      prazo_execucao_dias_uteis: 10,
+      condicoes_pagamento: 'A COMBINAR',
+      dados_json: payloadJson 
+    };
+
+    if (orcamentoEditando) {
+      const { error } = await supabase.from('orcamentos').update(orcamentoPayload).eq('id', orcamentoEditando.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from('orcamentos').insert([orcamentoPayload]);
+      if (error) throw error;
+    }
+    return valorTotal;
+  };
+
+  // Botão 1: Apenas Salva no Banco
+  const handleApenasSalvar = async () => {
+    setSalvando(true);
     try {
-      const orcamentoPayload = {
-        cliente_id: cliente.id,
-        titulo: tipoSelecionado, 
-        valor: valorTotal,
-        // Se estiver editando, preserva a data e situação originais
-        data_envio: orcamentoEditando ? orcamentoEditando.data_envio : new Date().toISOString().split('T')[0],
-        situacao_orcamento: orcamentoEditando ? orcamentoEditando.situacao_orcamento : 'Aguardando',
-        validade_dias: 20,
-        prazo_execucao_dias_uteis: 10,
-        condicoes_pagamento: 'A COMBINAR',
-        dados_json: payloadJson // <- Salva a fotografia do momento!
-      };
+      await salvarNoBanco();
+      alert("✅ Orçamento salvo com sucesso! Você pode gerar o documento depois.");
+      onClose();
+    } catch (err: any) {
+      alert("Erro ao salvar: " + err.message);
+    } finally {
+      setSalvando(false);
+    }
+  };
 
-      // Atualiza ou Insere dependendo do contexto
-      if (orcamentoEditando) {
-        const { error } = await supabase.from('orcamentos').update(orcamentoPayload).eq('id', orcamentoEditando.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('orcamentos').insert([orcamentoPayload]);
-        if (error) throw error;
-      }
+  // Botão 2: Salva no Banco E gera o arquivo Word
+  const handleSalvarEGerarWord = async () => {
+    setGerando(true);
+    try {
+      const valorTotal = await salvarNoBanco();
 
-      // Prepara os dados para gerar o arquivo Word
       const dadosExport = {
         nome_cliente: cliente.nome,
         cnpj_cliente: cliente.cnpj_cpf,
@@ -182,11 +242,11 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
       // @ts-ignore
       await window.acorreaAPI.gerarPropostaAssessoriaLaudos(dadosExport);
 
-      setGerando(false);
       onClose(); 
     } catch (err: any) {
+      alert("Erro na geração: " + err.message);
+    } finally {
       setGerando(false);
-      alert("Erro: " + err.message);
     }
   };
 
@@ -206,7 +266,7 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
             <td style={{ padding: '8px 0' }}>{item.nome}</td>
             <td style={{ padding: '4px' }}>
               <input 
-                type="number" step="0.10" disabled={gerando} value={item.preco} 
+                type="number" step="0.10" disabled={gerando || salvando} value={item.preco} 
                 onChange={(e) => {
                   const novos = [...itens];
                   novos[index].preco = Number(e.target.value);
@@ -217,7 +277,7 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
             </td>
             <td style={{ padding: '4px' }}>
               <input 
-                type="number" min="0" disabled={gerando} value={item.quantidade} 
+                type="number" min="0" disabled={gerando || salvando} value={item.quantidade} 
                 onChange={(e) => {
                   const novos = [...itens];
                   novos[index].quantidade = Number(e.target.value);
@@ -240,18 +300,26 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
       <div style={modalContentStyle}>
         <h3>{orcamentoEditando ? '✏️ Editar Proposta Comercial' : '📝 Gerar Nova Proposta Comercial'}</h3>
         
-        <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee' }}>
-          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', fontSize: '13px' }}>
-            Selecione o Tipo de Proposta:
-          </label>
-          <select 
-            value={tipoSelecionado} 
-            onChange={(e) => setTipoSelecionado(e.target.value)}
-            disabled={gerando || !!orcamentoEditando} // Bloqueia troca de tipo se estiver editando
-            style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '14px', opacity: orcamentoEditando ? 0.7 : 1 }}
-          >
-            {TIPOS_PROPOSTA.map(tipo => <option key={tipo} value={tipo}>{tipo}</option>)}
-          </select>
+        <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ width: '70%' }}>
+            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', fontSize: '13px' }}>
+              Selecione o Tipo de Proposta:
+            </label>
+            <select 
+              value={tipoSelecionado} 
+              onChange={(e) => setTipoSelecionado(e.target.value)}
+              disabled={gerando || salvando || !!orcamentoEditando} 
+              style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '14px', opacity: orcamentoEditando ? 0.7 : 1 }}
+            >
+              {TIPOS_PROPOSTA.map(tipo => <option key={tipo} value={tipo}>{tipo}</option>)}
+            </select>
+          </div>
+          
+          {tipoSelecionado !== "Proposta Assessoria AVCB e Laudos" && (
+            <button onClick={exportarParaExcel} style={btnExcelStyle}>
+              📊 Exportar Itens
+            </button>
+          )}
         </div>
 
         <div style={{ maxHeight: '40vh', overflowY: 'auto', paddingRight: '10px' }}>
@@ -262,7 +330,7 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
                 <div key={key}>
                   <label style={{ fontSize: '11px', color: '#555' }}>{key.replace('preco_', '').replace(/_/g, ' ').toUpperCase()}</label>
                   <input 
-                    type="number" disabled={gerando}
+                    type="number" disabled={gerando || salvando}
                     style={{ width: '100%', padding: '6px', border: '1px solid #ccc', borderRadius: '4px', boxSizing: 'border-box' }} 
                     value={precos[key]} 
                     onChange={e => setPrecos({...precos, [key]: Number(e.target.value)})}
@@ -284,10 +352,17 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
           TOTAL DA PROPOSTA: R$ {calcularTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
         </div>
         
-        <div style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-          <button onClick={onClose} disabled={gerando} style={{ padding: '10px 20px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc', background: 'white' }}>Cancelar</button>
-          <button onClick={salvarEGerar} disabled={gerando} style={{ padding: '10px 20px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>
-            {gerando ? '⏳ Processando...' : (orcamentoEditando ? '💾 Atualizar e Gerar Word' : '💾 Salvar e Gerar Word')}
+        <div style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid #eee', paddingTop: '15px' }}>
+          <button onClick={onClose} disabled={gerando || salvando} style={btnCancelStyle}>Cancelar</button>
+          
+          {/* BOTÃO 1: APENAS SALVAR */}
+          <button onClick={handleApenasSalvar} disabled={gerando || salvando} style={btnOutlineGreenStyle}>
+            {salvando ? '⏳ Salvando...' : '💾 Apenas Salvar'}
+          </button>
+          
+          {/* BOTÃO 2: SALVAR E GERAR WORD */}
+          <button onClick={handleSalvarEGerarWord} disabled={gerando || salvando} style={btnSolidGreenStyle}>
+            {gerando ? '⏳ Processando...' : '📄 Salvar e Gerar Word'}
           </button>
         </div>
       </div>
@@ -295,5 +370,10 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
   );
 }
 
+// ESTILOS
 const modalOverlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 };
-const modalContentStyle: React.CSSProperties = { backgroundColor: 'white', padding: '30px', borderRadius: '8px', width: '700px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' };
+const modalContentStyle: React.CSSProperties = { backgroundColor: 'white', padding: '30px', borderRadius: '8px', width: '750px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' };
+const btnCancelStyle: React.CSSProperties = { padding: '10px 20px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc', background: 'white', fontWeight: 'bold', color: '#555' };
+const btnOutlineGreenStyle: React.CSSProperties = { padding: '10px 20px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #28a745', background: '#e8f5e9', color: '#28a745', fontWeight: 'bold' };
+const btnSolidGreenStyle: React.CSSProperties = { padding: '10px 20px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' };
+const btnExcelStyle: React.CSSProperties = { padding: '10px 15px', backgroundColor: '#1d6f42', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', height: 'fit-content' };
