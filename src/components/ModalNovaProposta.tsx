@@ -14,7 +14,9 @@ const TIPOS_PROPOSTA = [
   "Proposta Adequações: Central de Alarme",
   "Proposta Adequações: Registro de Recalque",
   "Proposta Adequações: Iluminação de Emergência",
-  "Proposta Adequações: Bomba de Incêndio"
+  "Proposta Adequações: Bomba de Incêndio",
+  "Proposta Adequações: Extintores",
+  "Proposta Adequações: Andares e Escadarias" // <-- NOVA OPÇÃO ADICIONADA
 ];
 
 interface CategoriaItem {
@@ -36,6 +38,8 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
   const [itensRecalque, setItensRecalque] = useState<CategoriaItem[]>([]);
   const [itensIluminacao, setItensIluminacao] = useState<CategoriaItem[]>([]);
   const [itensBomba, setItensBomba] = useState<CategoriaItem[]>([]);
+  const [itensExtintores, setItensExtintores] = useState<CategoriaItem[]>([]);
+  const [itensEscadaria, setItensEscadaria] = useState<CategoriaItem[]>([]); // <-- NOVO ESTADO
 
   useEffect(() => {
     if (orcamentoEditando && orcamentoEditando.titulo) {
@@ -92,6 +96,8 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
         setItensRecalque(mapearCategoria('Registro de Recalque', 'itensRecalque'));
         setItensIluminacao(mapearCategoria('Iluminação de Emergência', 'itensIluminacao'));
         setItensBomba(mapearCategoria('Bomba de Incêndio', 'itensBomba'));
+        setItensExtintores(mapearCategoria('Extintores', 'itensExtintores'));
+        setItensEscadaria(mapearCategoria('Andares e Escadarias', 'itensEscadaria')); // <-- MAPEAMENTO
       }
     }
     carregarPrecos();
@@ -110,6 +116,10 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
       return itensIluminacao.reduce((acc, item) => acc + (item.preco * item.quantidade), 0);
     } else if (tipoSelecionado === "Proposta Adequações: Bomba de Incêndio") {
       return itensBomba.reduce((acc, item) => acc + (item.preco * item.quantidade), 0);
+    } else if (tipoSelecionado === "Proposta Adequações: Extintores") {
+      return itensExtintores.reduce((acc, item) => acc + (item.preco * item.quantidade), 0);
+    } else if (tipoSelecionado === "Proposta Adequações: Andares e Escadarias") {
+      return itensEscadaria.reduce((acc, item) => acc + (item.preco * item.quantidade), 0); // <-- CÁLCULO TOTAL
     }
     return 0;
   };
@@ -120,6 +130,8 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
     if (tipoSelecionado === "Proposta Adequações: Registro de Recalque") return itensRecalque;
     if (tipoSelecionado === "Proposta Adequações: Iluminação de Emergência") return itensIluminacao;
     if (tipoSelecionado === "Proposta Adequações: Bomba de Incêndio") return itensBomba;
+    if (tipoSelecionado === "Proposta Adequações: Extintores") return itensExtintores;
+    if (tipoSelecionado === "Proposta Adequações: Andares e Escadarias") return itensEscadaria; // <-- EXPORTAÇÃO EXCEL
     return [];
   };
 
@@ -144,7 +156,6 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
       `"${(item.preco * item.quantidade).toFixed(2).replace('.', ',')}"`
     ]);
 
-    // Linha final com o total
     linhas.push(['"TOTAL GERAL"', '', '', '', `"${calcularTotal().toFixed(2).replace('.', ',')}"`]);
 
     const csvContent = "\uFEFF" + [cabecalho.join(';'), ...linhas.map(l => l.join(';'))].join('\n');
@@ -170,7 +181,6 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
     }).join('\n');
   };
 
-  // Função central para persistir os dados no banco
   const salvarNoBanco = async () => {
     const valorTotal = calcularTotal();
     const payloadJson = {
@@ -180,6 +190,8 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
       itensRecalque: itensRecalque.filter(i => i.quantidade > 0),
       itensIluminacao: itensIluminacao.filter(i => i.quantidade > 0),
       itensBomba: itensBomba.filter(i => i.quantidade > 0),
+      itensExtintores: itensExtintores.filter(i => i.quantidade > 0),
+      itensEscadaria: itensEscadaria.filter(i => i.quantidade > 0), // <-- SALVAMENTO
     };
 
     const orcamentoPayload = {
@@ -204,7 +216,6 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
     return valorTotal;
   };
 
-  // Botão 1: Apenas Salva no Banco
   const handleApenasSalvar = async () => {
     setSalvando(true);
     try {
@@ -218,7 +229,6 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
     }
   };
 
-  // Botão 2: Salva no Banco E gera o arquivo Word
   const handleSalvarEGerarWord = async () => {
     setGerando(true);
     try {
@@ -237,6 +247,8 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
         itens_recalque: formatarItensParaWord(itensRecalque),
         itens_iluminacao: formatarItensParaWord(itensIluminacao),
         itens_bomba: formatarItensParaWord(itensBomba),
+        itens_extintores: formatarItensParaWord(itensExtintores),
+        itens_escadaria: formatarItensParaWord(itensEscadaria), // <-- CHAVE ENVIADA PARA O WORD
       };
 
       // @ts-ignore
@@ -345,6 +357,8 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
           {tipoSelecionado === "Proposta Adequações: Registro de Recalque" && renderTabelaItens(itensRecalque, setItensRecalque)}
           {tipoSelecionado === "Proposta Adequações: Iluminação de Emergência" && renderTabelaItens(itensIluminacao, setItensIluminacao)}
           {tipoSelecionado === "Proposta Adequações: Bomba de Incêndio" && renderTabelaItens(itensBomba, setItensBomba)}
+          {tipoSelecionado === "Proposta Adequações: Extintores" && renderTabelaItens(itensExtintores, setItensExtintores)}
+          {tipoSelecionado === "Proposta Adequações: Andares e Escadarias" && renderTabelaItens(itensEscadaria, setItensEscadaria)} {/* <-- RENDERIZAÇÃO DA TELA */}
 
         </div>
         
@@ -355,12 +369,10 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
         <div style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid #eee', paddingTop: '15px' }}>
           <button onClick={onClose} disabled={gerando || salvando} style={btnCancelStyle}>Cancelar</button>
           
-          {/* BOTÃO 1: APENAS SALVAR */}
           <button onClick={handleApenasSalvar} disabled={gerando || salvando} style={btnOutlineGreenStyle}>
             {salvando ? '⏳ Salvando...' : '💾 Apenas Salvar'}
           </button>
           
-          {/* BOTÃO 2: SALVAR E GERAR WORD */}
           <button onClick={handleSalvarEGerarWord} disabled={gerando || salvando} style={btnSolidGreenStyle}>
             {gerando ? '⏳ Processando...' : '📄 Salvar e Gerar Word'}
           </button>

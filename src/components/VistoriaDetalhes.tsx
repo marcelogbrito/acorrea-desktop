@@ -1,3 +1,4 @@
+//src\components\VistoriaDetalhes.tsx
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 
@@ -315,8 +316,9 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
             
             <OptionsRow 
               label="Tipo de Edificação" 
+              field="tipo_edificacao" // <-- ADICIONADO PARA AGRUPAR OS RADIOS
               value={vistoria.tipo_edificacao} 
-              onChange={(v: any) => setVistoria({ ...vistoria, tipo_edificacao: v })} 
+              onChange={(_: any, v: any) => setVistoria({ ...vistoria, tipo_edificacao: v })} // <-- CORRIGIDO PARA RECEBER O SEGUNDO PARÂMETRO
               options={[{ label: 'Residencial', value: 'Residencial' }, { label: 'Comercial', value: 'Comercial' }, { label: 'Misto', value: 'Misto' }]} 
             />
 
