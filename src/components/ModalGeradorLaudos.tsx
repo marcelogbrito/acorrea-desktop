@@ -6,18 +6,18 @@ interface ModalProps {
 }
 
 const LISTA_LAUDOS = [
-  { id: 'alarme', nome: 'Alarme', arquivo: 'modelo_laudo_alarme.docx' },
-  { id: 'medidas', nome: 'Medidas de Segurança', arquivo: 'modelo_laudo_medidas_seguranca.docx' },
-  { id: 'pressurizacao', nome: 'Pressurização de Escadas', arquivo: 'modelo_laudo_pressurizacao_escadas.docx' },
-  { id: 'eletrica', nome: 'Instalações Elétricas', arquivo: 'modelo_laudo_eletrica.docx' },
-  { id: 'hidrantes', nome: 'Hidrantes e Mangotinhos', arquivo: 'modelo_laudo_hidrantes_mangotinhos.docx' },
-  { id: 'spda', nome: 'SPDA (Para-raios)', arquivo: 'modelo_laudo_spda.docx' },
-  { id: 'shafts', nome: 'Selagem de Shafts', arquivo: 'modelo_laudo_selagem_shafts.docx' },
-  { id: 'gas', nome: 'Instalações de Gás', arquivo: 'modelo_laudo_gas.docx' },
-  { id: 'equipamentos', nome: 'Equipamentos de Segurança', arquivo: 'modelo_laudo_equipamentos_seguranca.docx' },
-  { id: 'cmar', nome: 'CMAR', arquivo: 'modelo_laudo_CMAR.docx' },
-  { id: 'gerador', nome: 'Grupo Motogerador', arquivo: 'modelo_laudo_grupo_motogerador.docx' },
-  { id: 'sprinkler', nome: 'Chuveiros Automáticos', arquivo: 'modelo_laudo_sprinkler.docx' },
+  { id: 'alarme', nome: 'Alarme', arquivo: 'modelo_atestado_alarme.docx' },
+  { id: 'medidas', nome: 'Medidas de Segurança', arquivo: 'modelo_atestado_medidas_seguranca.docx' },
+  { id: 'pressurizacao', nome: 'Pressurização de Escadas', arquivo: 'modelo_atestado_pressurizacao_escadas.docx' },
+  { id: 'eletrica', nome: 'Instalações Elétricas', arquivo: 'modelo_atestado_eletrica.docx' },
+  { id: 'hidrantes', nome: 'Hidrantes e Mangotinhos', arquivo: 'modelo_atestado_hidrantes_mangotinhos.docx' },
+  { id: 'spda', nome: 'SPDA (Para-raios)', arquivo: 'modelo_atestado_spda.docx' },
+  { id: 'shafts', nome: 'Selagem de Shafts', arquivo: 'modelo_atestado_selagem_shafts.docx' },
+  { id: 'gas', nome: 'Instalações de Gás', arquivo: 'modelo_atestado_gas.docx' },
+  { id: 'equipamentos', nome: 'Equipamentos de Segurança', arquivo: 'modelo_atestado_equipamentos_seguranca.docx' },
+  { id: 'cmar', nome: 'CMAR', arquivo: 'modelo_atestado_CMAR.docx' },
+  { id: 'gerador', nome: 'Grupo Motogerador', arquivo: 'modelo_atestado_grupo_motogerador.docx' },
+  { id: 'sprinkler', nome: 'Chuveiros Automáticos', arquivo: 'modelo_atestado_sprinkler.docx' },
 ];
 
 export function ModalGeradorLaudos({ cliente, onClose }: ModalProps) {

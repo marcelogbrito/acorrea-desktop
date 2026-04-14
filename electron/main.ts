@@ -355,7 +355,7 @@ ipcMain.handle('gerar-laudos-lote', async (_, payload) => {
         ? path.join(process.resourcesPath, 'templates', laudo.arquivo) 
         : path.join(__dirname, '..', 'resources', 'templates', laudo.arquivo);
 
-      const nomeArquivo = `Laudo_${laudo.nome}_${nomeAmigavel}.docx`;
+      const nomeArquivo = `Atestado_${laudo.nome}_${nomeAmigavel}.docx`;
       const outputPath = path.join(app.getPath('downloads'), nomeArquivo);
 
       await gerarLaudoWorker(dadosTemplate, templatePath, outputPath);
