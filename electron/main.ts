@@ -287,6 +287,9 @@ ipcMain.handle('gerar-proposta-assessoria-laudos', async (_, dadosExportacao) =>
         case "Proposta Adequações: Extintores":
         templateFileName = 'modelo_proposta_adequacoes_extintor.docx'; // Crie este arquivo depois
         break;
+        case "Proposta Adequações: Hidrantes":
+        templateFileName = 'modelo_proposta_adequacoes_hidrante.docx'; // Crie este arquivo depois
+        break;
         case "Proposta Adequações: Andares e Escadarias":
         templateFileName = 'modelo_proposta_adequacoes_escadaria.docx'; // <-- ADICIONE ESTA LINHA!
         break;

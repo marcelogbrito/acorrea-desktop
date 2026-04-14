@@ -16,6 +16,7 @@ const TIPOS_PROPOSTA = [
   "Proposta Adequações: Iluminação de Emergência",
   "Proposta Adequações: Bomba de Incêndio",
   "Proposta Adequações: Extintores",
+  "Proposta Adequações: Hidrantes",
   "Proposta Adequações: Andares e Escadarias" // <-- NOVA OPÇÃO ADICIONADA
 ];
 
@@ -39,6 +40,7 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
   const [itensIluminacao, setItensIluminacao] = useState<CategoriaItem[]>([]);
   const [itensBomba, setItensBomba] = useState<CategoriaItem[]>([]);
   const [itensExtintores, setItensExtintores] = useState<CategoriaItem[]>([]);
+  const [itensHidrantes, setItensHidrantes] = useState<CategoriaItem[]>([]);
   const [itensEscadaria, setItensEscadaria] = useState<CategoriaItem[]>([]); // <-- NOVO ESTADO
 
   useEffect(() => {
@@ -97,6 +99,7 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
         setItensIluminacao(mapearCategoria('Iluminação de Emergência', 'itensIluminacao'));
         setItensBomba(mapearCategoria('Bomba de Incêndio', 'itensBomba'));
         setItensExtintores(mapearCategoria('Extintores', 'itensExtintores'));
+         setItensHidrantes(mapearCategoria('Hidrantes', 'itensHidrantes'));
         setItensEscadaria(mapearCategoria('Andares e Escadarias', 'itensEscadaria')); // <-- MAPEAMENTO
       }
     }
@@ -118,7 +121,9 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
       return itensBomba.reduce((acc, item) => acc + (item.preco * item.quantidade), 0);
     } else if (tipoSelecionado === "Proposta Adequações: Extintores") {
       return itensExtintores.reduce((acc, item) => acc + (item.preco * item.quantidade), 0);
-    } else if (tipoSelecionado === "Proposta Adequações: Andares e Escadarias") {
+    }  else if (tipoSelecionado === "Proposta Adequações: Hidrantes") {
+      return itensHidrantes.reduce((acc, item) => acc + (item.preco * item.quantidade), 0);
+    }else if (tipoSelecionado === "Proposta Adequações: Andares e Escadarias") {
       return itensEscadaria.reduce((acc, item) => acc + (item.preco * item.quantidade), 0); // <-- CÁLCULO TOTAL
     }
     return 0;
@@ -131,6 +136,8 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
     if (tipoSelecionado === "Proposta Adequações: Iluminação de Emergência") return itensIluminacao;
     if (tipoSelecionado === "Proposta Adequações: Bomba de Incêndio") return itensBomba;
     if (tipoSelecionado === "Proposta Adequações: Extintores") return itensExtintores;
+       if (tipoSelecionado === "Proposta Adequações: Hidrantes") return itensHidrantes;
+
     if (tipoSelecionado === "Proposta Adequações: Andares e Escadarias") return itensEscadaria; // <-- EXPORTAÇÃO EXCEL
     return [];
   };
@@ -191,6 +198,7 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
       itensIluminacao: itensIluminacao.filter(i => i.quantidade > 0),
       itensBomba: itensBomba.filter(i => i.quantidade > 0),
       itensExtintores: itensExtintores.filter(i => i.quantidade > 0),
+      itensHidrantes: itensHidrantes.filter(i => i.quantidade > 0),
       itensEscadaria: itensEscadaria.filter(i => i.quantidade > 0), // <-- SALVAMENTO
     };
 
@@ -248,6 +256,7 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
         itens_iluminacao: formatarItensParaWord(itensIluminacao),
         itens_bomba: formatarItensParaWord(itensBomba),
         itens_extintores: formatarItensParaWord(itensExtintores),
+        itens_hidrantes: formatarItensParaWord(itensHidrantes),
         itens_escadaria: formatarItensParaWord(itensEscadaria), // <-- CHAVE ENVIADA PARA O WORD
       };
 
@@ -358,6 +367,7 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
           {tipoSelecionado === "Proposta Adequações: Iluminação de Emergência" && renderTabelaItens(itensIluminacao, setItensIluminacao)}
           {tipoSelecionado === "Proposta Adequações: Bomba de Incêndio" && renderTabelaItens(itensBomba, setItensBomba)}
           {tipoSelecionado === "Proposta Adequações: Extintores" && renderTabelaItens(itensExtintores, setItensExtintores)}
+          {tipoSelecionado === "Proposta Adequações: Hidrantes" && renderTabelaItens(itensHidrantes, setItensHidrantes)}
           {tipoSelecionado === "Proposta Adequações: Andares e Escadarias" && renderTabelaItens(itensEscadaria, setItensEscadaria)} {/* <-- RENDERIZAÇÃO DA TELA */}
 
         </div>
