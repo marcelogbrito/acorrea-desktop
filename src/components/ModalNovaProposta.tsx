@@ -288,7 +288,7 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
       const doc = new Docxtemplater(zip, { 
         paragraphLoop: true, 
         linebreaks: true,
-        nullGetter(part) { return ""; }
+        nullGetter() { return ""; }
       });
 
       doc.render(dadosExport);
