@@ -208,7 +208,7 @@ const statsGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: '
 const mainColumnsGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 400px), 1fr))', gap: '25px', marginTop: '25px' };
 
 const statCard: React.CSSProperties = { backgroundColor: 'white', padding: '15px 20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', transition: 'all 0.3s' };
-const labelStyle: React.CSSProperties = { fontSize: '10px', color: '#888', fontWeight: 'bold', letterSpacing: '0.5px' };
+const labelStyle: React.CSSProperties = { fontSize: '10px', color: '#444', fontWeight: 'bold', letterSpacing: '0.5px' };
 const valueStyle: React.CSSProperties = { margin: '5px 0 0 0', fontSize: '22px', color: '#1a3353' };
 const panelStyle: React.CSSProperties = { backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 4px 10px rgba(0,0,0,0.08)' };
 const panelTitle: React.CSSProperties = { borderBottom: '2px solid #f0f2f5', paddingBottom: '12px', marginTop: 0, color: '#1a3353', fontSize: '17px' };

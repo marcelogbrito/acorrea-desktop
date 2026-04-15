@@ -65,3 +65,35 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* ==========================================================================
+   CORREÇÃO DE CONTRASTE GLOBAL E ACESSIBILIDADE
+   ========================================================================== */
+
+/* 1. Força os inputs desativados a terem texto escuro e fundo sólido */
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background-color: #eef2f5 !important;
+  color: #111 !important; /* Texto quase preto para contraste máximo */
+  opacity: 1 !important; /* Remove a transparência padrão do Safari/Chrome */
+  border: 1px solid #bbb !important; /* Borda um pouco mais escura */
+  -webkit-text-fill-color: #111 !important; /* Hack necessário para iOS/Safari */
+  font-weight: 500;
+}
+
+/* 2. Escurece os placeholders (textos de dica dentro do campo) */
+input::placeholder,
+textarea::placeholder {
+  color: #555 !important;
+  opacity: 1 !important;
+}
+
+/* 3. Melhora a cor das barras de rolagem para não sumirem no fundo branco */
+::-webkit-scrollbar-thumb {
+  background: #aaa;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #888;
+}

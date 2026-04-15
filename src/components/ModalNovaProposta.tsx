@@ -442,8 +442,7 @@ export function ModalNovaProposta({ cliente, orcamentoEditando, onClose }: Modal
               value={tipoSelecionado} 
               onChange={(e) => setTipoSelecionado(e.target.value)}
               disabled={gerando || salvando || !!orcamentoEditando} 
-              style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '14px', opacity: orcamentoEditando ? 0.7 : 1 }}
-            >
+              style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '14px' }}            >
               {TIPOS_PROPOSTA.map(tipo => <option key={tipo} value={tipo}>{tipo}</option>)}
             </select>
           </div>
