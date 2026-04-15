@@ -67,29 +67,44 @@ button:focus-visible {
 }
 
 /* ==========================================================================
-   CORREÇÃO DE CONTRASTE GLOBAL E ACESSIBILIDADE
+   CORREÇÃO DE CONTRASTE GLOBAL E ACESSIBILIDADE (MOBILE REAL - ANDROID/IOS)
    ========================================================================== */
 
-/* 1. Força os inputs desativados a terem texto escuro e fundo sólido */
+/* 1. Força máxima contra os estilos nativos do iOS/Android em campos desativados */
 input:disabled,
 select:disabled,
-textarea:disabled {
-  background-color: #eef2f5 !important;
-  color: #111 !important; /* Texto quase preto para contraste máximo */
-  opacity: 1 !important; /* Remove a transparência padrão do Safari/Chrome */
-  border: 1px solid #bbb !important; /* Borda um pouco mais escura */
-  -webkit-text-fill-color: #111 !important; /* Hack necessário para iOS/Safari */
-  font-weight: 500;
+textarea:disabled,
+input[disabled],
+select[disabled],
+textarea[disabled] {
+  background-color: #f4f7f6 !important; /* Um fundo um pouco mais escuro para destacar que não é editável */
+  color: #111111 !important; /* Quase preto */
+  
+  /* O segredo para vencer o iOS/Android: */
+  -webkit-text-fill-color: #111111 !important;
+  -webkit-opacity: 1 !important;
+  opacity: 1 !important;
+  
+  border: 1px solid #cccccc !important;
+  font-weight: 600 !important; /* Deixa a fonte mais gordinha para facilitar a leitura no sol */
 }
 
-/* 2. Escurece os placeholders (textos de dica dentro do campo) */
+/* 2. Tratamento específico para o Safari (iOS) que insiste em clarear selects */
+select:disabled {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+
+/* 3. Escurece os placeholders (textos de dica dentro do campo) */
 input::placeholder,
-textarea::placeholder {
-  color: #555 !important;
+textarea::placeholder,
+::-webkit-input-placeholder {
+  color: #555555 !important;
+  -webkit-text-fill-color: #555555 !important;
   opacity: 1 !important;
 }
 
-/* 3. Melhora a cor das barras de rolagem para não sumirem no fundo branco */
+/* 4. Melhora a cor das barras de rolagem para não sumirem no fundo branco */
 ::-webkit-scrollbar-thumb {
   background: #aaa;
   border-radius: 4px;
