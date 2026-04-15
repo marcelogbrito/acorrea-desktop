@@ -750,14 +750,13 @@ export function VistoriaDetalhes({ vistoriaId, onBack }: any) {
 }
 
 // ESTILOS
-const headerActionStyle = { position: 'fixed' as 'fixed', top: 0, left: 0, right: 0, height: '60px', background: 'white', borderBottom: '1px solid #ddd', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', zIndex: 100, boxShadow: '0 2px 5px rgba(0,0,0,0.1)' };
-const rowStyle = { marginBottom: '15px', borderBottom: '1px solid #f9f9f9', paddingBottom: '10px' };
+const headerActionStyle: React.CSSProperties = { position: 'sticky', top: 0, left: 0, right: 0, background: 'white', borderBottom: '1px solid #ddd', display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px', zIndex: 100, boxShadow: '0 2px 5px rgba(0,0,0,0.1)' };
+const gridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '15px' };
+const radioLabelStyle = { display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', background: '#f8f9fa', padding: '8px', borderRadius: '4px', border: '1px solid #eee', cursor: 'pointer', flex: '1 1 auto', justifyContent: 'center' };const rowStyle = { marginBottom: '15px', borderBottom: '1px solid #f9f9f9', paddingBottom: '10px' };
 const labelStyle = { fontSize: '13px', fontWeight: '600', color: '#444', display: 'block', marginBottom: '5px' };
-const radioLabelStyle = { display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', background: '#f8f9fa', padding: '5px 10px', borderRadius: '4px', border: '1px solid #eee', cursor: 'pointer' };
 const fullWidthInputStyle = { width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '14px', boxSizing: 'border-box' as 'border-box' };
 const miniInputStyle = { width: '100%', padding: '6px', fontSize: '12px', border: '1px solid #eee', borderRadius: '4px', marginTop: '5px', boxSizing: 'border-box' as 'border-box', background: '#fffef0' };
 const textareaStyle = { width: '100%', padding: '10px', border: '1px solid #ccc', borderRadius: '4px', minHeight: '80px', fontFamily: 'inherit', fontSize: '14px', marginTop: '10px', boxSizing: 'border-box' as 'border-box' };
-const gridStyle = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' };
 const btnBackStyle = { background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', color: '#1a3353' };
 const btnSaveStyle = { background: '#28a745', color: 'white', padding: '8px 16px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', transition: 'background-color 0.3s' };
 const btnWordStyle = { background: '#1a3353', color: 'white', padding: '8px 16px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' };

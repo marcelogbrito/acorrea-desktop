@@ -21,7 +21,7 @@ import { gerarLaudoWorker } from '../automation/laudo_worker';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Identificação Única da Máquina (Para Criptografia Multi-máquina)
+// Identificação Única da Máquina
 const myDeviceId = machineIdSync();
 
 // Configuração Supabase
@@ -137,7 +137,6 @@ ipcMain.handle('salvar-credencial', async (_, { servico, usuario, senhaLimpa }) 
 
 ipcMain.handle('executar-robo-ginfes', async (_, credentials) => {
   const { usuario, senha_hash, clienteCnpj, valorNota, descricaoServico } = credentials;
-  
   try {
     const senhaReal = decryptPassword(senha_hash);
     const canal = await garantirNavegador();
@@ -250,9 +249,10 @@ ipcMain.handle('executar-pycad', async (_, payload) => {
 });
 
 ipcMain.handle('gerar-relatorio-vistoria-previa', async (_, { vistoriaId }) => {
+  // <-- CORREÇÃO DA ROTA DO ARQUIVO AQUI: DE 'resources' PARA 'public' NO MODO DEV
   const templatePath = app.isPackaged 
     ? path.join(process.resourcesPath, 'templates', 'modelo_vistoria_previa.docx') 
-    : path.join(__dirname, '..', 'resources', 'templates', 'modelo_vistoria_previa.docx');
+    : path.join(__dirname, '..', 'public', 'templates', 'modelo_vistoria_previa.docx');
 
   const outputPath = path.join(app.getPath('downloads'), `Relatorio_Vistoria_${vistoriaId}.docx`);
   await gerarRelatorioVistoriaPrevia(vistoriaId, templatePath, outputPath, SUPABASE_URL, SERVICE_KEY);
@@ -265,7 +265,6 @@ ipcMain.handle('gerar-relatorio-vistoria-previa', async (_, { vistoriaId }) => {
 // ==========================================
 ipcMain.handle('gerar-proposta-assessoria-laudos', async (_, dadosExportacao) => {
   try {
-    // 1. Roteador de Templates (Identifica o Word correto baseado na escolha do React)
     let templateFileName = 'modelo_proposta_assessoria_laudos.docx';
 
     switch (dadosExportacao.titulo_proposta) {
@@ -279,47 +278,40 @@ ipcMain.handle('gerar-proposta-assessoria-laudos', async (_, dadosExportacao) =>
         templateFileName = 'modelo_proposta_adequacoes_registro_recalque.docx';
         break;
       case "Proposta Adequações: Iluminação de Emergência":
-        templateFileName = 'modelo_proposta_adequacoes_iluminacao.docx'; // Crie este arquivo depois
+        templateFileName = 'modelo_proposta_adequacoes_iluminacao.docx'; 
         break;
       case "Proposta Adequações: Bomba de Incêndio":
-        templateFileName = 'modelo_proposta_adequacoes_bomba.docx'; // Crie este arquivo depois
+        templateFileName = 'modelo_proposta_adequacoes_bomba.docx'; 
         break;
-        case "Proposta Adequações: Extintores":
-        templateFileName = 'modelo_proposta_adequacoes_extintor.docx'; // Crie este arquivo depois
+      case "Proposta Adequações: Extintores":
+        templateFileName = 'modelo_proposta_adequacoes_extintores.docx'; 
         break;
-        case "Proposta Adequações: Hidrantes":
-        templateFileName = 'modelo_proposta_adequacoes_hidrante.docx'; // Crie este arquivo depois
-        break;
-        case "Proposta Adequações: Andares e Escadarias":
-        templateFileName = 'modelo_proposta_adequacoes_escadaria.docx'; // <-- ADICIONE ESTA LINHA!
+      case "Proposta Adequações: Andares e Escadarias":
+        templateFileName = 'modelo_proposta_adequacoes_escadaria.docx'; 
         break;
     }
 
+    // <-- CORREÇÃO DA ROTA DO ARQUIVO AQUI: DE 'resources' PARA 'public' NO MODO DEV
     const templatePath = app.isPackaged 
       ? path.join(process.resourcesPath, 'templates', templateFileName) 
-      : path.join(__dirname, '..', 'resources', 'templates', templateFileName);
+      : path.join(__dirname, '..', 'public', 'templates', templateFileName);
 
-    // 2. Injeta Data por Extenso para os Templates (ex: 16 de março de 2026)
     const dataFormatada = new Date().toLocaleDateString('pt-BR', {
       day: 'numeric', month: 'long', year: 'numeric'
     });
     dadosExportacao.data_extenso = dataFormatada;
 
-    // 3. Garante compatibilidade do Endereço (com ç) exigido nos novos modelos PDF
     if (dadosExportacao.endereco_cliente) {
       dadosExportacao.endereço_cliente = dadosExportacao.endereco_cliente;
     }
 
-    // 4. Configura o Nome do Arquivo de Saída
     const nomeAmigavel = dadosExportacao.nome_cliente.replace(/[^a-z0-9]/gi, '_');
     const prefixo = templateFileName.replace('.docx', '').replace('modelo_', '');
     const nomeArquivo = `${prefixo}_${nomeAmigavel}_${Date.now()}.docx`;
     const outputPath = path.join(app.getPath('downloads'), nomeArquivo);
 
-    // 5. Envia para o Worker (docxtemplater)
     await gerarPropostaAssessoriaLaudos(dadosExportacao, templatePath, outputPath);
 
-    // 6. Abre o Word gerado
     shell.openPath(outputPath); 
     return { success: true };
   } catch (err: any) {
@@ -351,11 +343,13 @@ ipcMain.handle('gerar-laudos-lote', async (_, payload) => {
     const nomeAmigavel = cliente.nome.replace(/[^a-z0-9]/gi, '_');
 
     for (const laudo of laudosSelecionados) {
+      
+      // <-- CORREÇÃO DA ROTA DO ARQUIVO AQUI: DE 'resources' PARA 'public' NO MODO DEV
       const templatePath = app.isPackaged 
         ? path.join(process.resourcesPath, 'templates', laudo.arquivo) 
-        : path.join(__dirname, '..', 'resources', 'templates', laudo.arquivo);
+        : path.join(__dirname, '..', 'public', 'templates', laudo.arquivo);
 
-      const nomeArquivo = `Atestado_${laudo.nome}_${nomeAmigavel}.docx`;
+      const nomeArquivo = `Laudo_${laudo.nome}_${nomeAmigavel}.docx`;
       const outputPath = path.join(app.getPath('downloads'), nomeArquivo);
 
       await gerarLaudoWorker(dadosTemplate, templatePath, outputPath);
@@ -394,4 +388,3 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-

@@ -392,11 +392,10 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
 // --- ESTILOS CONSOLIDADOS ---
 const containerStyle: React.CSSProperties = { padding: '20px', backgroundColor: '#f4f7f6', minHeight: '100vh', width: '100%', boxSizing: 'border-box' };
 const headerStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', width: '100%' };
-const mainGridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', gap: '20px', width: '100%', alignItems: 'start' };
-const columnStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: '20px' };
+const mainGridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 400px), 1fr))', gap: '20px', width: '100%', alignItems: 'start' };
+const formGridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '15px' };const columnStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: '20px' };
 const cardStyle: React.CSSProperties = { backgroundColor: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', width: '100%', boxSizing: 'border-box' };
 const cardHeaderStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid #f0f0f0', paddingBottom: '10px' };
-const formGridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' };
 const actionsRowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' };
 const avcbStatusStyle: React.CSSProperties = { padding: '8px 16px', borderRadius: '4px', fontWeight: 'bold' };
 const tabsContainerStyle: React.CSSProperties = { display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '1px solid #ddd' };

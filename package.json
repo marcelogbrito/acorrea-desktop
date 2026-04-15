@@ -67,9 +67,9 @@
       "dist/**/*",
       "dist-electron/**/*"
     ],
-    "extraResources": [
+   "extraResources": [
       {
-        "from": "resources/templates",
+        "from": "public/templates",
         "to": "templates",
         "filter": [
           "**/*"

@@ -174,30 +174,26 @@ function App() {
           <>
             <section style={formSectionStyle}>
               <h3>➕ Novo Cadastro</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 2fr auto', gap: '15px', alignItems: 'end' }}>
-                <input disabled={loading} placeholder="Nome/Condomínio" style={inputStyle} value={novoCliente.nome} onChange={e => setNovoCliente({ ...novoCliente, nome: e.target.value })} />
-                <input disabled={loading} placeholder="CPF/CNPJ" style={inputStyle} value={novoCliente.cnpj_cpf} onChange={e => setNovoCliente({ ...novoCliente, cnpj_cpf: e.target.value })} />
-                <select disabled={loading} style={inputStyle} value={novoCliente.parceiro_id} onChange={e => setNovoCliente({ ...novoCliente, parceiro_id: e.target.value })}>
-                  <option value="">Atendimento Direto</option>
-                  {parceiros.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                </select>
-                
-                <input disabled={loading} placeholder="Endereço (Opcional)" style={inputStyle} value={novoCliente.endereco} onChange={e => setNovoCliente({ ...novoCliente, endereco: e.target.value })} />
-                
-                <button 
-                  onClick={handleCadastrarCliente} 
-                  style={cadastroSucesso ? { ...btnGreenStyle, backgroundColor: '#20c997' } : btnGreenStyle} 
-                  disabled={loading}
-                >
-                  {loading ? '⏳ Processando...' : cadastroSucesso ? '✅ Cadastrado!' : 'Cadastrar'}
-                </button>
-              </div>
+              {/* APAGUE AQUELE DIV COM O GRID DE 5 COLUNAS E USE ESTE: */}
+<div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'end' }}>
+  <input disabled={loading} placeholder="Nome/Condomínio" style={{...inputStyle, flex: '1 1 200px'}} value={novoCliente.nome} onChange={e => setNovoCliente({ ...novoCliente, nome: e.target.value })} />
+  <input disabled={loading} placeholder="CPF/CNPJ" style={{...inputStyle, flex: '1 1 150px'}} value={novoCliente.cnpj_cpf} onChange={e => setNovoCliente({ ...novoCliente, cnpj_cpf: e.target.value })} />
+  <select disabled={loading} style={{...inputStyle, flex: '1 1 150px'}} value={novoCliente.parceiro_id} onChange={e => setNovoCliente({ ...novoCliente, parceiro_id: e.target.value })}>
+    <option value="">Atendimento Direto</option>
+    {parceiros.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+  </select>
+  <input disabled={loading} placeholder="Endereço (Opcional)" style={{...inputStyle, flex: '1 1 250px'}} value={novoCliente.endereco} onChange={e => setNovoCliente({ ...novoCliente, endereco: e.target.value })} />
+  
+  <button onClick={handleCadastrarCliente} style={{ ...(cadastroSucesso ? { ...btnGreenStyle, backgroundColor: '#20c997' } : btnGreenStyle), flex: '1 1 100px' }} disabled={loading}>
+    {loading ? '⏳...' : cadastroSucesso ? '✅ Cadastrado!' : 'Cadastrar'}
+  </button>
+</div>
             </section>
 
             <div style={{ marginBottom: '20px' }}>
               <input type="text" placeholder="🔍 Buscar condomínio..." style={{ ...inputStyle, width: '100%', padding: '12px' }} value={filtroBusca} onChange={(e) => setFiltroBusca(e.target.value)} />
             </div>
-
+<div style={{ overflowX: 'auto', width: '100%' }}>
             <table style={tableStyle}>
               <thead>
                 <tr style={{ textAlign: 'left', backgroundColor: '#f8f9fa' }}>
@@ -218,6 +214,7 @@ function App() {
                 ))}
               </tbody>
             </table>
+            </div>
           </>
         )}
       </main>
@@ -227,12 +224,12 @@ function App() {
   )
 }
 
-const navStyle = { display: 'flex', gap: '20px', padding: '15px 25px', backgroundColor: '#1a3353', color: 'white', alignItems: 'center' };
-const badgeStyle = { backgroundColor: '#d9534f', color: 'white', padding: '2px 6px', borderRadius: '10px', fontSize: '10px', marginLeft: '5px' };
+const navStyle: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '15px 20px', backgroundColor: '#1a3353', color: 'white', alignItems: 'center' };
+// Para o formulário quebrar em várias linhas no telemóvel:
+const formSectionStyle = { backgroundColor: '#f9f9f9', padding: '20px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '20px', display: 'flex', flexDirection: 'column' as 'column', gap: '15px' };const badgeStyle = { backgroundColor: '#d9534f', color: 'white', padding: '2px 6px', borderRadius: '10px', fontSize: '10px', marginLeft: '5px' };
 const btnSairStyle = { marginLeft: 'auto', background: 'none', border: '1px solid #fff', color: '#fff', padding: '5px 15px', borderRadius: '4px', cursor: 'pointer' };
 const tabStyle = { background: 'none', border: 'none', color: '#b0c4de', cursor: 'pointer', fontSize: '15px', padding: '10px' };
 const activeTabStyle = { ...tabStyle, color: '#fff', fontWeight: 'bold', border: 'none', borderBottom: '2px solid #fff' };
-const formSectionStyle = { backgroundColor: '#f9f9f9', padding: '20px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '30px' };
 const inputStyle = { padding: '10px', borderRadius: '4px', border: '1px solid #ccc' };
 const btnGreenStyle = { padding: '12px 25px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', transition: 'background-color 0.3s' };
 const btnPurpleStyle = { padding: '6px 15px', backgroundColor: '#6f42c1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' };
