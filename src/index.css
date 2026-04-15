@@ -1,12 +1,12 @@
-
 :root {
   color-scheme: light;
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  /* FORÇA O TEXTO ESCURO E O FUNDO CLARO SEMPRE! */
+  color: #213547;
+  background-color: #ffffff;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -25,7 +25,7 @@ a:hover {
 
 body {
   margin: 0;
-  display: block;    /* Mude de flex para block para o conteúdo fluir naturalmente */
+  display: block;
   width: 100%;
   min-height: 100vh;
 }
@@ -42,7 +42,8 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: #f9f9f9;
+  color: #213547;
   cursor: pointer;
   transition: border-color 0.25s;
 }
@@ -52,19 +53,6 @@ button:hover {
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
 }
 
 /* ==========================================================================
@@ -78,16 +66,15 @@ textarea:disabled,
 input[disabled],
 select[disabled],
 textarea[disabled] {
-  background-color: #f4f7f6 !important; /* Um fundo um pouco mais escuro para destacar que não é editável */
-  color: #111111 !important; /* Quase preto */
+  background-color: #f4f7f6 !important; 
+  color: #111111 !important; 
   
-  /* O segredo para vencer o iOS/Android: */
   -webkit-text-fill-color: #111111 !important;
   -webkit-opacity: 1 !important;
   opacity: 1 !important;
   
   border: 1px solid #cccccc !important;
-  font-weight: 600 !important; /* Deixa a fonte mais gordinha para facilitar a leitura no sol */
+  font-weight: 600 !important; 
 }
 
 /* 2. Tratamento específico para o Safari (iOS) que insiste em clarear selects */
