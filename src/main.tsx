@@ -2,6 +2,12 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
+import { registerSW } from 'virtual:pwa-register'
+
+// Registra o Service Worker (o "motor" do PWA)
+if ('serviceWorker' in navigator) {
+  registerSW({ immediate: true })
+}
 
 // --- POLYFILL PARA VERSÃO WEB (HÍBRIDA) ---
 // Se o aplicativo estiver rodando no navegador web (Vercel), a API do Electron não existe.
