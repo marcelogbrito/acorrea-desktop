@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:web": "VERCEL=1 vite",
     "build": "tsc && vite build && electron-builder",
     "build:web": "tsc && vite build",
     "release": "npm run build && tsx scripts/deploy-version.ts",
