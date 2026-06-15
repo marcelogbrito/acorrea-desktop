@@ -150,19 +150,39 @@ ipcMain.handle('executar-robo-ginfes', async (_, credentials) => {
     const page = await browser.newPage();
     await page.goto('https://santoandre.ginfes.com.br/', { waitUntil: 'networkidle' });
 
-    const okButton = page.getByRole('button', { name: 'OK' });
-    try { await okButton.waitFor({ state: 'visible', timeout: 3000 }); await okButton.click(); } catch (e) {}
+    // FUNÇÃO AUXILIAR: Detecta e fecha avisos flutuantes/informativos do Ginfes instantaneamente
+    const fecharModalInformativo = async (timeoutMs = 1500) => {
+      try {
+        // Localiza o botão OK especificamente dentro de janelas de aviso do sistema
+        const botaoOK = page.locator('.x-window-bwrap button:has-text("OK"), button:has-text("OK")').first();
+        if (await botaoOK.isVisible({ timeout: timeoutMs })) {
+          await botaoOK.click();
+          await page.waitForTimeout(600); // Aguarda o efeito de fade-out do modal terminar
+        }
+      } catch (e) {
+        // Ignora o erro se o modal não aparecer na tela, permitindo que o robô siga em frente
+      }
+    };
+
+    // 1. Limpa avisos logo na página inicial
+    await fecharModalInformativo(2000); 
 
     await page.click('img[alt="Acesso Exclusivo Prestador"]');
     await page.locator('input[type="text"]:visible').first().fill(usuario);
     await page.locator('input[type="password"]:visible').first().fill(senhaReal);
     await page.locator('.x-btn:has-text("Entrar")').first().click();
 
+    // 2. Limpa avisos que costumam saltar imediatamente após o login do prestador
+    await page.waitForTimeout(1000);
+    await fecharModalInformativo(1500);
+
     const btnEmitir = page.locator('div.gwt-PushButton:has(img[src*="icon_nfse3.gif"])').first();
     await btnEmitir.waitFor({ state: 'visible' });
     await btnEmitir.click();
 
-    await page.waitForTimeout(2000);
+    // 3. Limpa avisos que pulam ao carregar o ambiente de emissão da NFSe
+    await page.waitForTimeout(1500);
+    await fecharModalInformativo(1500);
     
     let cnpjInput = null;
     for (const frame of page.frames()) {
