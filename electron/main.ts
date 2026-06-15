@@ -153,15 +153,12 @@ ipcMain.handle('executar-robo-ginfes', async (_, credentials) => {
     // FUNÇÃO AUXILIAR: Detecta e fecha avisos flutuantes/informativos do Ginfes instantaneamente
     const fecharModalInformativo = async (timeoutMs = 1500) => {
       try {
-        // Localiza o botão OK especificamente dentro de janelas de aviso do sistema
         const botaoOK = page.locator('.x-window-bwrap button:has-text("OK"), button:has-text("OK")').first();
         if (await botaoOK.isVisible({ timeout: timeoutMs })) {
           await botaoOK.click();
-          await page.waitForTimeout(600); // Aguarda o efeito de fade-out do modal terminar
+          await page.waitForTimeout(600); 
         }
-      } catch (e) {
-        // Ignora o erro se o modal não aparecer na tela, permitindo que o robô siga em frente
-      }
+      } catch (e) {}
     };
 
     // 1. Limpa avisos logo na página inicial
@@ -183,17 +180,38 @@ ipcMain.handle('executar-robo-ginfes', async (_, credentials) => {
     // 3. Limpa avisos que pulam ao carregar o ambiente de emissão da NFSe
     await page.waitForTimeout(1500);
     await fecharModalInformativo(1500);
-    
-    let cnpjInput = null;
+
+    // Aguarda a tela assentar e a aba de emissão carregar
+    await page.waitForTimeout(2000);
+
+    // O SEGREDO AQUI: Busca semântica pelo quadro "Pesquisa Tomador" 
+    // Fugimos dos IDs aleatórios do ExtJS (como ext-gen524)
+    let inputCnpj = null;
+    let btnPesquisar = null;
+
     for (const frame of page.frames()) {
-      const el = frame.locator('input[name*="cnpj"]:visible').first();
-      if (await el.isVisible()) { cnpjInput = el; break; }
+      const painelPesquisa = frame.locator('fieldset').filter({ hasText: 'Pesquisa Tomador' });
+      if (await painelPesquisa.count() > 0) {
+        inputCnpj = painelPesquisa.locator('input[type="text"]:visible').first();
+        btnPesquisar = painelPesquisa.locator('button').filter({ hasText: 'Pesquisar' }).first();
+        break;
+      }
     }
 
-    if (cnpjInput) {
-      await cnpjInput.fill(clienteCnpj || '');
-      const parent = cnpjInput.page() || page;
-      await parent.locator('button:has-text("Pesquisar")').first().click();
+    if (inputCnpj && btnPesquisar) {
+      await inputCnpj.waitFor({ state: 'visible', timeout: 5000 });
+      await inputCnpj.click();
+      await page.waitForTimeout(300);
+      
+      await inputCnpj.fill(clienteCnpj || '');
+      
+      // TEMPO CRUCIAL: O ExtJS precisa de um momento para validar o número digitado
+      await page.waitForTimeout(1000); 
+      
+      await btnPesquisar.click();
+      
+      // Aguarda 3 segundos para o sistema processar a busca e carregar o cliente na tabela
+      await page.waitForTimeout(3000);
     }
 
     const btnProx = page.locator('button:has-text("Próximo Passo")').first();
