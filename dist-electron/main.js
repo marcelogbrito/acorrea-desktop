@@ -98538,6 +98538,12 @@ ipcMain.handle("executar-robo-ginfes", async (_, credentials) => {
       } catch (e2) {
       }
     };
+    const clicarProximoPasso = async () => {
+      const btnProx = page.locator('button:has-text("Próximo Passo"):visible').first();
+      await btnProx.waitFor({ state: "visible", timeout: 5e3 });
+      await btnProx.click();
+      await page.waitForTimeout(1500);
+    };
     await fecharModalInformativo(2e3);
     await page.click('img[alt="Acesso Exclusivo Prestador"]');
     await page.locator('input[type="text"]:visible').first().fill(usuario);
@@ -98570,12 +98576,47 @@ ipcMain.handle("executar-robo-ginfes", async (_, credentials) => {
       await btnPesquisar.click();
       await page.waitForTimeout(3e3);
     }
-    const btnProx = page.locator('button:has-text("Próximo Passo")').first();
-    await btnProx.waitFor({ state: "visible" });
-    await btnProx.click();
-    await page.locator("input.cbTextAlign:visible").first().click();
-    await page.locator('.x-combo-list-item:has-text("17.02")').first().click();
-    await page.locator("textarea.x-form-textarea:visible").fill(descricaoServico || "");
+    await clicarProximoPasso();
+    try {
+      const radioAtividade = page.locator("input.cbTextAlign:visible").first();
+      if (await radioAtividade.isVisible()) {
+        await radioAtividade.click();
+        await page.locator('.x-combo-list-item:has-text("17.02")').first().click();
+        await page.waitForTimeout(500);
+      }
+    } catch (e2) {
+    }
+    const selecionarUltimaOpcaoCombo = async (labelTexto) => {
+      try {
+        const formItem = page.locator(".x-form-item").filter({ hasText: labelTexto });
+        const inputCombo = formItem.locator("input.x-form-text").first();
+        await inputCombo.click();
+        await page.waitForTimeout(1e3);
+        const listaAtiva = page.locator('.x-combo-list[style*="visibility: visible"]');
+        const ultimaOpcao = listaAtiva.locator(".x-combo-list-item").last();
+        await ultimaOpcao.click();
+        await page.waitForTimeout(500);
+      } catch (e2) {
+        console.error(`Falha ao preencher o combo: ${labelTexto}`);
+      }
+    };
+    try {
+      const inputAliquota = page.locator(".x-form-item").filter({ hasText: "Aliquota (%)" }).locator("input.x-form-text:not([readonly])").first();
+      await inputAliquota.click();
+      await inputAliquota.fill("2");
+      await page.waitForTimeout(500);
+    } catch (e2) {
+      console.error("Campo Alíquota não encontrado ou não editável.");
+    }
+    await selecionarUltimaOpcaoCombo("NBS");
+    await selecionarUltimaOpcaoCombo("Código Indicador da Operação");
+    await selecionarUltimaOpcaoCombo("Código de Situação Tributária");
+    await selecionarUltimaOpcaoCombo("Classificacao Tributária");
+    const textAreaDescricao = page.locator("textarea.x-form-textarea:visible").first();
+    await textAreaDescricao.click();
+    await textAreaDescricao.fill(descricaoServico || "");
+    await page.waitForTimeout(500);
+    await clicarProximoPasso();
     const vInput = page.locator("input.alinhaValores:visible").first();
     await vInput.click({ clickCount: 3 });
     await vInput.press("Backspace");

@@ -1,4 +1,4 @@
-//src\App.tsx
+// src/App.tsx
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
 import { Login } from './components/Login'
@@ -8,8 +8,9 @@ import { Visao360 } from './components/Visao360'
 import { Dashboard } from './components/Dashboard'
 import { InboxGeral } from './components/InboxGeral' 
 import { GerenciadorPrecos } from './components/GerenciadorPrecos'
+import { GerenciadorParceiros } from './components/GerenciadorParceiros'
 
-type Pagina = 'dashboard' | 'clientes' | 'inbox' | 'precos' | 'config';
+type Pagina = 'dashboard' | 'clientes' | 'parceiros' | 'inbox' | 'precos' | 'config';
 
 function App() {
   const [session, setSession] = useState<any>(null)
@@ -18,7 +19,7 @@ function App() {
   const [parceiros, setParceiros] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [contagemPendentes, setContagemPendentes] = useState(0)
-  const [cadastroSucesso, setCadastroSucesso] = useState(false) // NOVO: Controle de sucesso sem travar a tela
+  const [cadastroSucesso, setCadastroSucesso] = useState(false) 
   
   const [filtroBusca, setFiltroBusca] = useState('')
   const [clienteParaEmissao, setClienteParaEmissao] = useState<any | null>(null)
@@ -26,7 +27,6 @@ function App() {
 
   const [novoCliente, setNovoCliente] = useState({ nome: '', cnpj_cpf: '', parceiro_id: '', endereco: '' })
 
-  // Atualizado: Aceita um parâmetro isBackground para não congelar a tela
   async function fetchData(isBackground = false) {
     if (!isBackground) setLoading(true);
     try {
@@ -43,7 +43,6 @@ function App() {
     }
   }
 
-  // FUNÇÃO DE CADASTRO BLINDADA CONTRA TRAVAMENTOS (SEM ALERTS)
   const handleCadastrarCliente = async () => {
     if (!novoCliente.nome || !novoCliente.cnpj_cpf) {
       return alert("Nome e CNPJ/CPF são obrigatórios.");
@@ -57,24 +56,22 @@ function App() {
           nome: novoCliente.nome.toUpperCase(),
           cnpj_cpf: novoCliente.cnpj_cpf.replace(/\D/g, ''),
           endereco: novoCliente.endereco,
-          parceiro_id: novoCliente.parceiro_id || null,
+          // MÁGICA AQUI: Se a string estiver vazia, envia null para o Supabase
+          parceiro_id: novoCliente.parceiro_id === '' ? null : novoCliente.parceiro_id,
         }]);
 
       if (error) throw error;
 
-      // Limpa os campos instantaneamente
       setNovoCliente({ nome: '', cnpj_cpf: '', parceiro_id: '', endereco: '' });
       
-      // Feedback visual limpo (sem alert para não travar a thread)
       setCadastroSucesso(true);
       setTimeout(() => setCadastroSucesso(false), 3000);
       
-      // Atualiza a tabela em modo "Fantasma" (isBackground = true)
       fetchData(true); 
     } catch (err: any) {
       alert("❌ Erro ao cadastrar: " + (err.message || "Verifique os dados"));
     } finally {
-      setLoading(false); // Libera o botão de imediato
+      setLoading(false);
     }
   };
 
@@ -109,7 +106,7 @@ function App() {
     return (
       <Visao360 
         cliente={clienteAtivo} 
-        onBack={() => setClienteAtivo(null)} 
+        onBack={() => { setClienteAtivo(null); fetchData(true); }} 
         onSolicitarEmissao={async (cli, dados) => {
           try {
             const { data: creds, error } = await supabase
@@ -149,6 +146,7 @@ function App() {
         
         <button onClick={() => setView('dashboard')} style={view === 'dashboard' ? activeTabStyle : tabStyle}>📊 Dashboard</button>
         <button onClick={() => setView('clientes')} style={view === 'clientes' ? activeTabStyle : tabStyle}>👥 Clientes</button>
+        <button onClick={() => setView('parceiros')} style={view === 'parceiros' ? activeTabStyle : tabStyle}>🤝 Parceiros</button>
         <button onClick={() => setView('inbox')} style={view === 'inbox' ? activeTabStyle : tabStyle}>
           📥 Inbox {contagemPendentes > 0 && <span style={badgeStyle}>{contagemPendentes}</span>}
         </button>
@@ -168,52 +166,65 @@ function App() {
 
         {view === 'precos' && <GerenciadorPrecos />}
 
+        {view === 'parceiros' && (
+  <GerenciadorParceiros 
+    onSelecionarCliente={(clienteMapeado) => {
+      setClienteAtivo(clienteMapeado);
+    }} 
+  />
+)}
+
         {view === 'config' && <Configuracoes onBack={() => setView('dashboard')} />}
 
         {view === 'clientes' && (
           <>
             <section style={formSectionStyle}>
               <h3>➕ Novo Cadastro</h3>
-              {/* APAGUE AQUELE DIV COM O GRID DE 5 COLUNAS E USE ESTE: */}
-<div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'end' }}>
-  <input disabled={loading} placeholder="Nome/Condomínio" style={{...inputStyle, flex: '1 1 200px'}} value={novoCliente.nome} onChange={e => setNovoCliente({ ...novoCliente, nome: e.target.value })} />
-  <input disabled={loading} placeholder="CPF/CNPJ" style={{...inputStyle, flex: '1 1 150px'}} value={novoCliente.cnpj_cpf} onChange={e => setNovoCliente({ ...novoCliente, cnpj_cpf: e.target.value })} />
-  <select disabled={loading} style={{...inputStyle, flex: '1 1 150px'}} value={novoCliente.parceiro_id} onChange={e => setNovoCliente({ ...novoCliente, parceiro_id: e.target.value })}>
-    <option value="">Atendimento Direto</option>
-    {parceiros.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-  </select>
-  <input disabled={loading} placeholder="Endereço (Opcional)" style={{...inputStyle, flex: '1 1 250px'}} value={novoCliente.endereco} onChange={e => setNovoCliente({ ...novoCliente, endereco: e.target.value })} />
-  
-  <button onClick={handleCadastrarCliente} style={{ ...(cadastroSucesso ? { ...btnGreenStyle, backgroundColor: '#20c997' } : btnGreenStyle), flex: '1 1 100px' }} disabled={loading}>
-    {loading ? '⏳...' : cadastroSucesso ? '✅ Cadastrado!' : 'Cadastrar'}
-  </button>
-</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'end' }}>
+                <input disabled={loading} placeholder="Nome/Condomínio" style={{...inputStyle, flex: '1 1 200px'}} value={novoCliente.nome} onChange={e => setNovoCliente({ ...novoCliente, nome: e.target.value })} />
+                <input disabled={loading} placeholder="CPF/CNPJ" style={{...inputStyle, flex: '1 1 150px'}} value={novoCliente.cnpj_cpf} onChange={e => setNovoCliente({ ...novoCliente, cnpj_cpf: e.target.value })} />
+             <select 
+  disabled={loading} 
+  style={{...inputStyle, flex: '1 1 150px'}} 
+  value={novoCliente.parceiro_id} 
+  onChange={e => setNovoCliente({ ...novoCliente, parceiro_id: e.target.value })}
+>
+                  <option value="">Atendimento Direto</option>
+                  {parceiros.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                </select>
+                <input disabled={loading} placeholder="Endereço (Opcional)" style={{...inputStyle, flex: '1 1 250px'}} value={novoCliente.endereco} onChange={e => setNovoCliente({ ...novoCliente, endereco: e.target.value })} />
+                
+                <button onClick={handleCadastrarCliente} style={{ ...(cadastroSucesso ? { ...btnGreenStyle, backgroundColor: '#20c997' } : btnGreenStyle), flex: '1 1 100px' }} disabled={loading}>
+                  {loading ? '⏳...' : cadastroSucesso ? '✅ Cadastrado!' : 'Cadastrar'}
+                </button>
+              </div>
             </section>
 
             <div style={{ marginBottom: '20px' }}>
               <input type="text" placeholder="🔍 Buscar condomínio..." style={{ ...inputStyle, width: '100%', padding: '12px' }} value={filtroBusca} onChange={(e) => setFiltroBusca(e.target.value)} />
             </div>
-<div style={{ overflowX: 'auto', width: '100%' }}>
-            <table style={tableStyle}>
-              <thead>
-                <tr style={{ textAlign: 'left', backgroundColor: '#f8f9fa' }}>
-                  <th style={{ padding: '15px' }}>Condomínio</th>
-                  <th style={{ padding: '15px' }}>CNPJ</th>
-                  <th style={{ padding: '15px' }}>Parceiro</th>
-                  <th style={{ padding: '15px' }}>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clientes.filter(c => c.nome?.toLowerCase().includes(filtroBusca.toLowerCase()) || c.cnpj_cpf?.includes(filtroBusca)).map(c => (
-                    <tr key={c.id} style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '15px' }}><strong>{c.nome}</strong></td>
-                      <td style={{ padding: '15px', color: '#666' }}>{c.cnpj_cpf}</td>
-                      <td style={{ padding: '15px' }}>{c.parceiro?.nome || 'Direto'}</td>
-                      <td style={{ padding: '15px' }}><button onClick={() => setClienteAtivo(c)} style={btnPurpleStyle}>🔍 Visão 360°</button></td>
-                    </tr>
-                ))}
-              </tbody>
-            </table>
+
+            <div style={{ overflowX: 'auto', width: '100%' }}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr style={{ textAlign: 'left', backgroundColor: '#f8f9fa' }}>
+                    <th style={{ padding: '15px' }}>Condomínio</th>
+                    <th style={{ padding: '15px' }}>CNPJ</th>
+                    <th style={{ padding: '15px' }}>Parceiro</th>
+                    <th style={{ padding: '15px' }}>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clientes.filter(c => c.nome?.toLowerCase().includes(filtroBusca.toLowerCase()) || c.cnpj_cpf?.includes(filtroBusca)).map(c => (
+                      <tr key={c.id} style={{ borderBottom: '1px solid #eee' }}>
+                        <td style={{ padding: '15px' }}><strong>{c.nome}</strong></td>
+                        <td style={{ padding: '15px', color: '#666' }}>{c.cnpj_cpf}</td>
+                        <td style={{ padding: '15px' }}>{c.parceiro?.nome || 'Direto'}</td>
+                        <td style={{ padding: '15px' }}><button onClick={() => setClienteAtivo(c)} style={btnPurpleStyle}>🔍 Visão 360°</button></td>
+                      </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </>
         )}
@@ -225,8 +236,8 @@ function App() {
 }
 
 const navStyle: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '15px 20px', backgroundColor: '#1a3353', color: 'white', alignItems: 'center' };
-// Para o formulário quebrar em várias linhas no telemóvel:
-const formSectionStyle = { backgroundColor: '#f9f9f9', padding: '20px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '20px', display: 'flex', flexDirection: 'column' as 'column', gap: '15px' };const badgeStyle = { backgroundColor: '#d9534f', color: 'white', padding: '2px 6px', borderRadius: '10px', fontSize: '10px', marginLeft: '5px' };
+const formSectionStyle = { backgroundColor: '#f9f9f9', padding: '20px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '20px', display: 'flex', flexDirection: 'column' as 'column', gap: '15px' };
+const badgeStyle = { backgroundColor: '#d9534f', color: 'white', padding: '2px 6px', borderRadius: '10px', fontSize: '10px', marginLeft: '5px' };
 const btnSairStyle = { marginLeft: 'auto', background: 'none', border: '1px solid #fff', color: '#fff', padding: '5px 15px', borderRadius: '4px', cursor: 'pointer' };
 const tabStyle = { background: 'none', border: 'none', color: '#b0c4de', cursor: 'pointer', fontSize: '15px', padding: '10px' };
 const activeTabStyle = { ...tabStyle, color: '#fff', fontWeight: 'bold', border: 'none', borderBottom: '2px solid #fff' };
@@ -235,4 +246,4 @@ const btnGreenStyle = { padding: '12px 25px', backgroundColor: '#28a745', color:
 const btnPurpleStyle = { padding: '6px 15px', backgroundColor: '#6f42c1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' };
 const tableStyle = { width: '100%', borderCollapse: 'collapse' as 'collapse', backgroundColor: '#fff', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' };
 
-export default App
+export default App;

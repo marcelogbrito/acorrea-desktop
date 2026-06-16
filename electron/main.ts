@@ -150,7 +150,7 @@ ipcMain.handle('executar-robo-ginfes', async (_, credentials) => {
     const page = await browser.newPage();
     await page.goto('https://santoandre.ginfes.com.br/', { waitUntil: 'networkidle' });
 
-    // FUNÇÃO AUXILIAR: Detecta e fecha avisos flutuantes/informativos do Ginfes instantaneamente
+    // FUNÇÃO AUXILIAR 1: Fechar Modais
     const fecharModalInformativo = async (timeoutMs = 1500) => {
       try {
         const botaoOK = page.locator('.x-window-bwrap button:has-text("OK"), button:has-text("OK")').first();
@@ -161,7 +161,14 @@ ipcMain.handle('executar-robo-ginfes', async (_, credentials) => {
       } catch (e) {}
     };
 
-    // 1. Limpa avisos logo na página inicial
+    // FUNÇÃO AUXILIAR 2: Clicar no botão "Próximo Passo" que estiver visível na tela
+    const clicarProximoPasso = async () => {
+      const btnProx = page.locator('button:has-text("Próximo Passo"):visible').first();
+      await btnProx.waitFor({ state: 'visible', timeout: 5000 });
+      await btnProx.click();
+      await page.waitForTimeout(1500); // Aguarda a próxima aba carregar
+    };
+
     await fecharModalInformativo(2000); 
 
     await page.click('img[alt="Acesso Exclusivo Prestador"]');
@@ -169,7 +176,6 @@ ipcMain.handle('executar-robo-ginfes', async (_, credentials) => {
     await page.locator('input[type="password"]:visible').first().fill(senhaReal);
     await page.locator('.x-btn:has-text("Entrar")').first().click();
 
-    // 2. Limpa avisos que costumam saltar imediatamente após o login do prestador
     await page.waitForTimeout(1000);
     await fecharModalInformativo(1500);
 
@@ -177,15 +183,11 @@ ipcMain.handle('executar-robo-ginfes', async (_, credentials) => {
     await btnEmitir.waitFor({ state: 'visible' });
     await btnEmitir.click();
 
-    // 3. Limpa avisos que pulam ao carregar o ambiente de emissão da NFSe
     await page.waitForTimeout(1500);
     await fecharModalInformativo(1500);
-
-    // Aguarda a tela assentar e a aba de emissão carregar
     await page.waitForTimeout(2000);
 
-    // O SEGREDO AQUI: Busca semântica pelo quadro "Pesquisa Tomador" 
-    // Fugimos dos IDs aleatórios do ExtJS (como ext-gen524)
+    // --- PASSO 1: PESQUISA DO TOMADOR ---
     let inputCnpj = null;
     let btnPesquisar = null;
 
@@ -202,26 +204,66 @@ ipcMain.handle('executar-robo-ginfes', async (_, credentials) => {
       await inputCnpj.waitFor({ state: 'visible', timeout: 5000 });
       await inputCnpj.click();
       await page.waitForTimeout(300);
-      
       await inputCnpj.fill(clienteCnpj || '');
-      
-      // TEMPO CRUCIAL: O ExtJS precisa de um momento para validar o número digitado
       await page.waitForTimeout(1000); 
-      
       await btnPesquisar.click();
-      
-      // Aguarda 3 segundos para o sistema processar a busca e carregar o cliente na tabela
-      await page.waitForTimeout(3000);
+      await page.waitForTimeout(3000); // Aguarda o carregamento do cliente
     }
 
-    const btnProx = page.locator('button:has-text("Próximo Passo")').first();
-    await btnProx.waitFor({ state: 'visible' });
-    await btnProx.click();
+    // Avança para a aba 2 (Serviços Prestados)
+    await clicarProximoPasso();
 
-    await page.locator('input.cbTextAlign:visible').first().click();
-    await page.locator('.x-combo-list-item:has-text("17.02")').first().click();
-    await page.locator('textarea.x-form-textarea:visible').fill(descricaoServico || '');
-    
+    // --- PASSO 2: PREENCHIMENTO DO SERVIÇO (Discriminação) ---
+    try {
+      const radioAtividade = page.locator('input.cbTextAlign:visible').first();
+      if (await radioAtividade.isVisible()) {
+        await radioAtividade.click();
+        await page.locator('.x-combo-list-item:has-text("17.02")').first().click();
+        await page.waitForTimeout(500);
+      }
+    } catch (e) {}
+
+    const selecionarUltimaOpcaoCombo = async (labelTexto: string) => {
+      try {
+        const formItem = page.locator('.x-form-item').filter({ hasText: labelTexto });
+        const inputCombo = formItem.locator('input.x-form-text').first();
+        
+        await inputCombo.click(); 
+        await page.waitForTimeout(1000); 
+        
+        const listaAtiva = page.locator('.x-combo-list[style*="visibility: visible"]');
+        const ultimaOpcao = listaAtiva.locator('.x-combo-list-item').last();
+        
+        await ultimaOpcao.click();
+        await page.waitForTimeout(500);
+      } catch (e) {
+        console.error(`Falha ao preencher o combo: ${labelTexto}`);
+      }
+    };
+
+    try {
+      const inputAliquota = page.locator('.x-form-item').filter({ hasText: 'Aliquota (%)' }).locator('input.x-form-text:not([readonly])').first();
+      await inputAliquota.click();
+      await inputAliquota.fill('2');
+      await page.waitForTimeout(500);
+    } catch (e) {
+      console.error("Campo Alíquota não encontrado ou não editável.");
+    }
+
+    await selecionarUltimaOpcaoCombo('NBS');
+    await selecionarUltimaOpcaoCombo('Código Indicador da Operação');
+    await selecionarUltimaOpcaoCombo('Código de Situação Tributária');
+    await selecionarUltimaOpcaoCombo('Classificacao Tributária');
+
+    const textAreaDescricao = page.locator('textarea.x-form-textarea:visible').first();
+    await textAreaDescricao.click();
+    await textAreaDescricao.fill(descricaoServico || '');
+    await page.waitForTimeout(500);
+
+    // Avança para a aba 3 (Valores)
+    await clicarProximoPasso();
+
+    // --- PASSO 3: VALOR DA NOTA ---
     const vInput = page.locator('input.alinhaValores:visible').first();
     await vInput.click({ clickCount: 3 }); 
     await vInput.press('Backspace');
@@ -233,7 +275,6 @@ ipcMain.handle('executar-robo-ginfes', async (_, credentials) => {
     return `❌ Erro no robô: ${error.message}`;
   }
 });
-
 // ==========================================
 // 4. AUTOMAÇÃO DE EMAIL E WHATSAPP
 // ==========================================

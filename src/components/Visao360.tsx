@@ -1,4 +1,4 @@
-//src\components\Visao360.tsx
+// src/components/Visao360.tsx
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { FormularioCobranca } from './FormularioCobranca'
@@ -22,11 +22,13 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
   const [notasFiscais, setNotasFiscais] = useState<any[]>([])
   const [contasAReceber, setContasAReceber] = useState<any[]>([])
   const [orcamentos, setOrcamentos] = useState<any[]>([])
+  const [parceirosDisponiveis, setParceirosDisponiveis] = useState<any[]>([])
   
   const [abrirNovaCobranca, setAbrirNovaCobranca] = useState(false)
+  const [receitaEditando, setReceitaEditando] = useState<any>(null) 
   const [abrirNovaVistoria, setAbrirNovaVistoria] = useState(false)
   const [abrirNovaProposta, setAbrirNovaProposta] = useState(false) 
-  const [orcamentoEditando, setOrcamentoEditando] = useState<any>(null) // <-- NOVO: Controle de Edição
+  const [orcamentoEditando, setOrcamentoEditando] = useState<any>(null) 
   const [vistoriaAbertaId, setVistoriaAbertaId] = useState<string | null>(null)
   
   const [subindoNotaId, setSubindoNotaId] = useState<string | null>(null)
@@ -43,24 +45,25 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
   async function loadClienteData() {
     setLoading(true)
     try {
-      const [resVist, resAvcb, resNF, resRec, resOrc] = await Promise.all([
+      const [resVist, resAvcb, resNF, resRec, resOrc, resParceiros] = await Promise.all([
         supabase.from('vistoria_previa_avcb').select('*, checklist_vistoria_avcb(*)').eq('cliente_id', cliente.id).order('created_at', { ascending: false }),
         supabase.from('avcbs_expedidas').select('*').eq('cliente_id', cliente.id).order('validade', { ascending: false }).limit(1),
         supabase.from('notas_fiscais').select('*, servicos(nome_servico)').eq('cliente_id', cliente.id).order('data_emissao', { ascending: false }),
         supabase.from('receitas').select('*').eq('cliente_id', cliente.id).order('data_vencimento', { ascending: true }),
-        supabase.from('orcamentos').select('*').eq('cliente_id', cliente.id).order('created_at', { ascending: false })
+        supabase.from('orcamentos').select('*').eq('cliente_id', cliente.id).order('created_at', { ascending: false }),
+        supabase.from('clientes').select('id, nome').eq('parceiro', true)
       ])
       setVistorias(resVist.data || [])
       setAvcbAtivo(resAvcb.data?.[0] || null)
       setNotasFiscais(resNF.data || [])
       setContasAReceber(resRec.data || [])
       setOrcamentos(resOrc.data || [])
+      setParceirosDisponiveis(resParceiros.data || [])
     } finally {
       setLoading(false)
     }
   }
 
-  // --- FUNÇÕES DE EXCLUSÃO E EDIÇÃO DE PROPOSTAS ---
   const excluirOrcamento = async (id: string) => {
     if (!window.confirm("🗑️ Deseja realmente excluir esta proposta comercial permanentemente?")) return;
     try {
@@ -74,7 +77,6 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
     setOrcamentoEditando(orcamento);
     setAbrirNovaProposta(true);
   }
-  // ------------------------------------------------
 
   const excluirReceita = async (id: string) => {
     if (!window.confirm("🗑️ Deseja realmente excluir esta cobrança?")) return;
@@ -100,11 +102,13 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
           cnpj_cpf: dadosCliente.cnpj_cpf,
           endereco: dadosCliente.endereco,
           telefone: dadosCliente.telefone,
-          email: dadosCliente.email
+          email: dadosCliente.email,
+          parceiro_id: dadosCliente.parceiro_id || null
         }).eq('id', cliente.id)
       if (error) throw error
-      alert("✅ Dados do cliente atualizados!")
+      alert("✅ Dados do cliente updated!")
       setEditandoDados(false)
+      loadClienteData()
     } catch (err: any) { alert("Erro ao atualizar: " + err.message) }
   }
 
@@ -145,7 +149,7 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
     const nf = notasFiscais.find(n => n.receita_id === receita.id)
     const urlBoleto = receita.path_documento_cobranca ? supabase.storage.from('boletos').getPublicUrl(receita.path_documento_cobranca).data.publicUrl : null
     const urlNF = nf?.file_path ? supabase.storage.from('notas_fiscais').getPublicUrl(nf.file_path).data.publicUrl : null
-    const msg = encodeURIComponent(`Olá! Segue a cobrança:\n*Serviço:* ${receita.discriminacao_servicos}\n*Valor:* R$ ${Number(receita.valor_receber).toLocaleString('pt-BR')}\n*Vencimento:* ${new Date(receita.data_vencimento).toLocaleDateString()}${urlBoleto ? `\n*Boleto:* ${urlBoleto}` : ''}${urlNF ? `\n*NF:* ${urlNF}` : ''}`)
+    const msg = encodeURIComponent(`Olá! Segue a cobrança:\n*Serviço:* ${receita.discriminacao_servicos}\n*Valor:* R$ ${Number(receita.valor_receber).toLocaleString('pt-BR')}\n*Vencimento:* ${renderizarDataSegura(receita.data_vencimento)}${urlBoleto ? `\n*Boleto:* ${urlBoleto}` : ''}${urlNF ? `\n*NF:* ${urlNF}` : ''}`)
     window.open(`https://web.whatsapp.com/send?phone=55${cliente.telefone?.replace(/\D/g, '')}&text=${msg}`, '_blank')
   }
 
@@ -180,6 +184,13 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
     loadClienteData();
   };
 
+  const renderizarDataSegura = (dataString: string) => {
+    if (!dataString) return '';
+    const dataLimpa = dataString.split('T')[0];
+    const [ano, mes, dia] = dataLimpa.split('-');
+    return `${dia}/${mes}/${ano}`;
+  };
+
   if (loading) return <div style={{ padding: '20px' }}>Carregando dados...</div>
 
   if (vistoriaAbertaId) {
@@ -193,7 +204,7 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
         <button onClick={onBack} style={btnBackStyle}>← Voltar para Lista</button>
         <h2 style={{ margin: 0 }}>🔍 Cliente: {dadosCliente.nome}</h2>
         <div style={{ ...avcbStatusStyle, backgroundColor: avcbAtivo ? '#d4edda' : '#f8d7da', color: avcbAtivo ? '#155724' : '#721c24' }}>
-          {avcbAtivo ? `AVCB Vence: ${new Date(avcbAtivo.validade).toLocaleDateString()}` : 'Sem AVCB Ativo'}
+          {avcbAtivo ? `AVCB Vence: ${renderizarDataSegura(avcbAtivo.validade)}` : 'Sem AVCB Ativo'}
         </div>
       </div>
 
@@ -219,6 +230,27 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
                   <label style={miniLabelStyle}>Nome</label>
                   <input disabled={!editandoDados} style={editandoDados ? inputEditableStyle : inputStaticStyle} value={dadosCliente.nome} onChange={e => setDadosCliente({...dadosCliente, nome: e.target.value})} />
                 </div>
+                
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label style={miniLabelStyle}>Vínculo de Parceiro</label>
+                  {editandoDados ? (
+                    <select 
+                      style={inputEditableStyle} 
+                      value={dadosCliente.parceiro_id || ''} 
+                      onChange={e => setDadosCliente({ ...dadosCliente, parceiro_id: e.target.value || null })}
+                    >
+                      <option value="">Atendimento Direto</option>
+                      {parceirosDisponiveis.map(p => (
+                        <option key={p.id} value={p.id}>{p.nome}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div style={{ ...inputStaticStyle, padding: '8px 0' }}>
+                      {dadosCliente.parceiro_id ? parceirosDisponiveis.find(p => p.id === dadosCliente.parceiro_id)?.nome || 'Direto' : 'Atendimento Direto'}
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <label style={miniLabelStyle}>CNPJ/CPF</label>
                   <input disabled={!editandoDados} style={editandoDados ? inputEditableStyle : inputStaticStyle} value={dadosCliente.cnpj_cpf} onChange={e => setDadosCliente({...dadosCliente, cnpj_cpf: e.target.value})} />
@@ -237,7 +269,7 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
             <section style={cardStyle}>
               <div style={cardHeaderStyle}>
                 <h3 style={{ margin: 0 }}>💳 Contas a Receber</h3>
-                <button onClick={() => setAbrirNovaCobranca(true)} style={btnGreenStyle}>+ Cobrança</button>
+                <button onClick={() => { setReceitaEditando(null); setAbrirNovaCobranca(true); }} style={btnGreenStyle}>+ Cobrança</button>
               </div>
               {contasAReceber.map(r => {
                 const nf = notasFiscais.find(n => n.receita_id === r.id)
@@ -250,11 +282,12 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
                       <span style={{ fontWeight: 'bold', color: pago ? 'green' : '#d9534f' }}>
                         {pago ? '✅' : '⏳'} {r.discriminacao_servicos}
                       </span>
-                      <span style={{ fontSize: '11px' }}>{new Date(r.data_vencimento).toLocaleDateString()}</span>
+                      <span style={{ fontSize: '11px' }}>{renderizarDataSegura(r.data_vencimento)}</span>
                     </div>
                     <div style={actionsRowStyle}>
-                      <strong>R$ {Number(r.valor_receber).toLocaleString('pt-BR')}</strong>
+                      <strong>R$ {Number(r.valor_receber).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
                       <div style={{ display: 'flex', gap: '8px' }}>
+                        {!pago && <button onClick={() => { setReceitaEditando(r); setAbrirNovaCobranca(true); }} style={btnSmallStyle}>✏️</button>}
                         <button onClick={() => excluirReceita(r.id)} style={{...btnSmallStyle, color: 'red'}}>🗑️</button>
                         {!pago && <button onClick={() => alterarStatusReceita(r.id, 'recebido')} style={btnGreenStyle}>Baixa</button>}
                         {pago && <button onClick={() => alterarStatusReceita(r.id, 'a_receber')} style={btnSmallStyle}>Estornar</button>}
@@ -277,8 +310,6 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
           </div>
 
           <div style={columnStyle}>
-            
-            {/* SEÇÃO ORÇAMENTOS ATUALIZADA (EDIÇÃO E EXCLUSÃO) */}
             <section style={cardStyle}>
               <div style={cardHeaderStyle}>
                 <h3 style={{ margin: 0 }}>📝 Propostas Comerciais</h3>
@@ -292,7 +323,7 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>
                         <span style={{ fontWeight: 'bold', color: '#1a3353', display: 'block', marginBottom: '2px' }}>{orc.titulo || 'Proposta Assessoria e Laudos'}</span>
-                        <span style={{ fontSize: '11px', color: '#666' }}>Emitido em: {new Date(orc.data_envio).toLocaleDateString()}</span>
+                        <span style={{ fontSize: '11px', color: '#666' }}>Emitido em: {renderizarDataSegura(orc.data_envio)}</span>
                       </div>
                       <select 
                         value={orc.situacao_orcamento} 
@@ -325,7 +356,7 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
               {vistorias.map(v => (
                 <div key={v.id} style={itemVistoriaStyle}>
                   <div>
-                    <div style={{ fontWeight: 'bold' }}>{new Date(v.data_agendamento).toLocaleDateString()}</div>
+                    <div style={{ fontWeight: 'bold' }}>{renderizarDataSegura(v.data_agendamento)}</div>
                     <div style={{ fontSize: '12px', color: v.situacao === 'concluida' ? 'green' : 'orange' }}>{v.situacao?.toUpperCase() || 'AGENDADA'}</div>
                   </div>
                   <button onClick={() => setVistoriaAbertaId(v.id)} style={btnOutlineStyle}>Checklist 📝</button>
@@ -366,7 +397,12 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
       )}
 
       {abrirNovaCobranca && (
-        <FormularioCobranca clienteId={cliente.id} onCancelar={() => setAbrirNovaCobranca(false)} onSucesso={() => { setAbrirNovaCobranca(false); loadClienteData(); }} />
+        <FormularioCobranca 
+          clienteId={cliente.id} 
+          receitaEditando={receitaEditando}
+          onCancelar={() => { setAbrirNovaCobranca(false); setReceitaEditando(null); }} 
+          onSucesso={() => { setAbrirNovaCobranca(false); setReceitaEditando(null); loadClienteData(); }} 
+        />
       )}
       {abrirNovaVistoria && (
         <NovaVistoriaModal clienteId={cliente.id} onClose={() => setAbrirNovaVistoria(false)} onSuccess={() => { setAbrirNovaVistoria(false); loadClienteData(); }} />
@@ -374,10 +410,10 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
       {abrirNovaProposta && (
         <ModalNovaProposta 
           cliente={cliente} 
-          orcamentoEditando={orcamentoEditando} // Passando os dados para edição
+          orcamentoEditando={orcamentoEditando} 
           onClose={() => { 
             setAbrirNovaProposta(false); 
-            setOrcamentoEditando(null); // Limpa o estado ao fechar
+            setOrcamentoEditando(null); 
             loadClienteData(); 
           }} 
         />
@@ -393,7 +429,8 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
 const containerStyle: React.CSSProperties = { padding: '20px', backgroundColor: '#f4f7f6', minHeight: '100vh', width: '100%', boxSizing: 'border-box' };
 const headerStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', width: '100%' };
 const mainGridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 400px), 1fr))', gap: '20px', width: '100%', alignItems: 'start' };
-const formGridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '15px' };const columnStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: '20px' };
+const formGridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '15px' };
+const columnStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: '20px' };
 const cardStyle: React.CSSProperties = { backgroundColor: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', width: '100%', boxSizing: 'border-box' };
 const cardHeaderStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid #f0f0f0', paddingBottom: '10px' };
 const actionsRowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' };
