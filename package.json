@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.97.0",
+    "@xmldom/xmldom": "^0.9.10",
     "bufferutil": "^4.1.0",
     "compare-versions": "^6.1.1",
     "docxtemplater": "^3.68.2",
@@ -21,6 +22,7 @@
     "jspdf": "^4.1.0",
     "jspdf-autotable": "^5.0.7",
     "mailparser": "^3.9.3",
+    "node-forge": "^1.4.0",
     "node-machine-id": "^1.1.12",
     "pizzip": "^3.2.0",
     "playwright": "^1.58.2",
@@ -31,7 +33,8 @@
     "react-dom": "^18.2.0",
     "simple-parser": "^0.0.0",
     "utf-8-validate": "^6.0.6",
-    "whatsapp-web.js": "^1.34.6"
+    "whatsapp-web.js": "^1.34.6",
+    "xml-crypto": "^3.0.0"
   },
   "devDependencies": {
     "@types/dotenv": "^6.1.1",
@@ -68,7 +71,7 @@
       "dist/**/*",
       "dist-electron/**/*"
     ],
-   "extraResources": [
+    "extraResources": [
       {
         "from": "public/templates",
         "to": "templates",

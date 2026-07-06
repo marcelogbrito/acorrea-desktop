@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<EnviarLoteRpsEnvio xmlns="http://www.giss.com.br/enviar-lote-rps-envio-v2_04.xsd">
+  <LoteRps Id="LOTE_1" versao="2.04">
+    <NumeroLote xmlns="http://www.giss.com.br/tipos-v2_04.xsd">1</NumeroLote>
+    <Prestador xmlns="http://www.giss.com.br/tipos-v2_04.xsd">
+      <CpfCnpj>
+        <Cnpj>53025056000167</Cnpj>
+      </CpfCnpj>
+      <InscricaoMunicipal>343897</InscricaoMunicipal>
+    </Prestador>
+    <QuantidadeRps xmlns="http://www.giss.com.br/tipos-v2_04.xsd">1</QuantidadeRps>
+    <ListaRps xmlns="http://www.giss.com.br/tipos-v2_04.xsd">
+      <Rps>
+        <InfDeclaracaoPrestacaoServico Id="RPS_1">
+          <Rps>
+            <IdentificacaoRps>
+              <Numero>202601</Numero>
+              <Serie>1</Serie>
+              <Tipo>1</Tipo>
+            </IdentificacaoRps>
+            <DataEmissao>2026-06-12</DataEmissao>
+            <Status>1</Status>
+          </Rps>
+          <Competencia>2026-06-12</Competencia>
+          <Servico>
+        <Valores>
+          <ValorServicos>5000.00</ValorServicos>
+          <ValorIss>100.00</ValorIss>
+          <Aliquota>0.0200</Aliquota>
+          <trib>
+            <tribFed>
+              <piscofins>
+                <CST>00</CST>
+                <vBCPisCofins>0.00</vBCPisCofins>
+                <pAliqPis>0.00</pAliqPis>
+                <pAliqCofins>0.00</pAliqCofins>
+                <vPis>0.00</vPis>
+                <vCofins>0.00</vCofins>
+                <tpRetPisCofins>2</tpRetPisCofins>
+              </piscofins>
+            </tribFed>
+            <totTrib>
+              <pTotTribSN>0.00</pTotTribSN>
+            </totTrib>
+          </trib>
+          <IBSCBS>
+            <finNFSe>0</finNFSe>
+            <indFinal>0</indFinal>
+            <cIndOp>100301</cIndOp>
+            <indDest>0</indDest>
+            <valores>
+              <trib>
+                <gIBSCBS>
+                  <CST>000</CST>
+                  <cClassTrib>000001</cClassTrib>
+                </gIBSCBS>
+              </trib>
+              <cLocalidadeIncid>3547809</cLocalidadeIncid>
+              <pRedutor>0</pRedutor>
+              <vBC>5000.00</vBC>
+            </valores>
+          </IBSCBS>
+        </Valores>
+        <IssRetido>2</IssRetido>
+        <ItemListaServico>17.02</ItemListaServico>
+        <CodigoCnae>8020001</CodigoCnae>
+        <CodigoTributacaoMunicipio>17.02</CodigoTributacaoMunicipio>
+        <CodigoNbs>114110000</CodigoNbs>
+        <Discriminacao>NF referente ao servico de correcao do sistema de Alarme (Parcela 1/1)</Discriminacao>
+        <CodigoMunicipio>3547809</CodigoMunicipio>
+        <CodigoPais>0076</CodigoPais> <!-- CORREÇÃO: Movido para cá -->
+        <ExigibilidadeISS>1</ExigibilidadeISS>
+        <MunicipioIncidencia>3547809</MunicipioIncidencia>
+      </Servico>
+          <Prestador>
+            <CpfCnpj>
+              <Cnpj>53025056000167</Cnpj>
+            </CpfCnpj>
+            <InscricaoMunicipal>343897</InscricaoMunicipal>
+          </Prestador>
+          <TomadorServico>
+            <IdentificacaoTomador>
+              <CpfCnpj>
+                <Cnpj>71929889000134</Cnpj>
+              </CpfCnpj>
+            </IdentificacaoTomador>
+            <RazaoSocial>Associacao Cultural Ciccillo Matarazzo - ACCIM</RazaoSocial>
+            <Endereco>
+              <Endereco>AVENIDA EUROPA</Endereco>
+              <Numero>158</Numero>
+              <Bairro>JARDIM EUROPA</Bairro>
+              <CodigoMunicipio>3550308</CodigoMunicipio>
+              <Uf>SP</Uf>
+              <Cep>01449000</Cep>
+            </Endereco>
+          </TomadorServico>
+          <OptanteSimplesNacional>1</OptanteSimplesNacional>
+          <IncentivoFiscal>2</IncentivoFiscal>
+        </InfDeclaracaoPrestacaoServico><Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/><Reference URI="#RPS_1"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/><Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/><DigestValue>OaJYXJz4k7WkwMZjEufwNKJB9Yc=</DigestValue></Reference></SignedInfo><SignatureValue>eedScI6WpFbx0MqmekjkcWQsSYEfzVItGASOinNsuMhVkIS1e/IHuuXBQAUrNW/OtEb/MdNIMUhN4tewa+oM8AwyGJTgEZTXMLc1o7d3yWZip6ZVlQ8bCRTYgOwMo7TeeqcK7HrFdMRs+YtFaIRwRWhPvIvozM9P8YklDqn9FkJvNE8KBxeSm4ckHLtu8t0OPwa/hFgBvSyA1hOA76QRx3oErPnhydhC7gGuFajOQ1B5JkorQAkZ3F0Y1flHCzp0T0xRU5so3ASiPR8naFMBdSM67dhnxf/uP7USga3mVDVkfMQcs6Uv6XgtyYvx9R2hbLx/4VliBcwtDct1YP60rQ==</SignatureValue><KeyInfo><X509Data><X509Certificate>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</X509Certificate></X509Data></KeyInfo></Signature>
+      </Rps>
+    </ListaRps>
+  </LoteRps><Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/><Reference URI="#LOTE_1"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/><Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/><DigestValue>jwpE36KJeKeYUovTRv2y6YDuJGw=</DigestValue></Reference></SignedInfo><SignatureValue>tm/+nvm17vBgPl3bL1XsbZ+uI3eDW0MlUrU1KTD5aXGB+erAWS7xQUZfx0c9HhdmwVPkhgcss1zzJrBqO4uN7nNEjh2zuE19xSAw1WcKgFoSiF+JUoAzMg/I3iLyo5pGY7ovs6t+WRAmm//0rfYuJNf9BMl5zo5unGUP3T5XbStKeLDDdPKPMLEFoHsj6GV3nrJ2oV+2WAcW+OgukEBLv71x68xbnl/z+qHI5uG2xFgiuVIPtFs3kdG7nC+V5+4AqFe/BEpSljIx75mM9zzyl4jHf80j6cs6QjHZRdW7Hi4evxoWqGdQURucXKqAIwbLylR1e5fzw8E0tC8DpS3epw==</SignatureValue><KeyInfo><X509Data><X509Certificate>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</X509Certificate></X509Data></KeyInfo></Signature>
+</EnviarLoteRpsEnvio>

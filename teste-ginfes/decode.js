@@ -1,0 +1,3 @@
+const resposta = "&gt;&lt;ListaMensagemRetorno&gt;&lt;ns3:MensagemRetorno&gt;&lt;ns3:Codigo&gt;A01&lt;/ns3:Codigo&gt;&lt;ns3:Mensagem&gt;Não foi possivel atender a solicitação&lt;/ns3:Mensagem&gt;&lt;ns3:Correcao&gt;Tente novamente mais tarde ou entre em contato com o atendimento.&lt;/ns3:Correcao&gt;&lt;/ns3:MensagemRetorno&gt;&lt;/ListaMensagemRetorno&gt;&lt;/ns4:GerarNfseResposta&gt;";
+// Use o comando abaixo para limpar e ver o erro real:
+console.log(resposta.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"'));

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<EnviarLoteRpsEnvio xmlns="http://www.giss.com.br/enviar-lote-rps-envio-v2_04.xsd">
+  <LoteRps Id="LOTE_1" versao="2.04">
+    <NumeroLote xmlns="http://www.giss.com.br/tipos-v2_04.xsd">1</NumeroLote>
+    <Prestador xmlns="http://www.giss.com.br/tipos-v2_04.xsd">
+      <CpfCnpj>
+        <Cnpj>53025056000167</Cnpj>
+      </CpfCnpj>
+      <InscricaoMunicipal>343897</InscricaoMunicipal>
+    </Prestador>
+    <QuantidadeRps xmlns="http://www.giss.com.br/tipos-v2_04.xsd">1</QuantidadeRps>
+    <ListaRps xmlns="http://www.giss.com.br/tipos-v2_04.xsd">
+      <Rps>
+        <InfDeclaracaoPrestacaoServico Id="RPS_1">
+          <Rps>
+            <IdentificacaoRps>
+              <Numero>202601</Numero>
+              <Serie>1</Serie>
+              <Tipo>1</Tipo>
+            </IdentificacaoRps>
+            <DataEmissao>2026-06-12</DataEmissao>
+            <Status>1</Status>
+          </Rps>
+          <Competencia>2026-06-12</Competencia>
+          <Servico>
+        <Valores>
+          <ValorServicos>5000.00</ValorServicos>
+          <ValorIss>100.00</ValorIss>
+          <Aliquota>0.0200</Aliquota>
+          <trib>
+            <tribFed>
+              <piscofins>
+                <CST>00</CST>
+                <vBCPisCofins>0.00</vBCPisCofins>
+                <pAliqPis>0.00</pAliqPis>
+                <pAliqCofins>0.00</pAliqCofins>
+                <vPis>0.00</vPis>
+                <vCofins>0.00</vCofins>
+                <tpRetPisCofins>2</tpRetPisCofins>
+              </piscofins>
+            </tribFed>
+            <totTrib>
+              <pTotTribSN>0.00</pTotTribSN>
+            </totTrib>
+          </trib>
+          <IBSCBS>
+            <finNFSe>0</finNFSe>
+            <indFinal>0</indFinal>
+            <cIndOp>100301</cIndOp>
+            <indDest>0</indDest>
+            <valores>
+              <trib>
+                <gIBSCBS>
+                  <CST>000</CST>
+                  <cClassTrib>000001</cClassTrib>
+                </gIBSCBS>
+              </trib>
+              <cLocalidadeIncid>3547809</cLocalidadeIncid>
+              <pRedutor>0</pRedutor>
+              <vBC>5000.00</vBC>
+            </valores>
+          </IBSCBS>
+        </Valores>
+        <IssRetido>2</IssRetido>
+        <ItemListaServico>17.02</ItemListaServico>
+        <CodigoCnae>8020001</CodigoCnae>
+        <CodigoTributacaoMunicipio>17.02</CodigoTributacaoMunicipio>
+        <CodigoNbs>114110000</CodigoNbs>
+        <Discriminacao>NF referente ao servico de correcao do sistema de Alarme (Parcela 1/1)</Discriminacao>
+        <CodigoMunicipio>3547809</CodigoMunicipio>
+        <CodigoPais>0076</CodigoPais> <!-- CORREÇÃO: Movido para cá -->
+        <ExigibilidadeISS>1</ExigibilidadeISS>
+        <MunicipioIncidencia>3547809</MunicipioIncidencia>
+      </Servico>
+          <Prestador>
+            <CpfCnpj>
+              <Cnpj>53025056000167</Cnpj>
+            </CpfCnpj>
+            <InscricaoMunicipal>343897</InscricaoMunicipal>
+          </Prestador>
+          <TomadorServico>
+            <IdentificacaoTomador>
+              <CpfCnpj>
+                <Cnpj>71929889000134</Cnpj>
+              </CpfCnpj>
+            </IdentificacaoTomador>
+            <RazaoSocial>Associacao Cultural Ciccillo Matarazzo - ACCIM</RazaoSocial>
+            <Endereco>
+              <Endereco>AVENIDA EUROPA</Endereco>
+              <Numero>158</Numero>
+              <Bairro>JARDIM EUROPA</Bairro>
+              <CodigoMunicipio>3550308</CodigoMunicipio>
+              <Uf>SP</Uf>
+              <Cep>01449000</Cep>
+            </Endereco>
+          </TomadorServico>
+          <OptanteSimplesNacional>1</OptanteSimplesNacional>
+          <IncentivoFiscal>2</IncentivoFiscal>
+        </InfDeclaracaoPrestacaoServico>
+      </Rps>
+    </ListaRps>
+  </LoteRps>
+</EnviarLoteRpsEnvio>

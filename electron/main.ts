@@ -143,82 +143,103 @@ ipcMain.handle('executar-robo-ginfes', async (_, credentials) => {
 
     const browser = await chromium.launch({ 
       headless: false, 
-      slowMo: 150,
+      slowMo: 100, 
       channel: canal as any 
     });
 
     const page = await browser.newPage();
     await page.goto('https://santoandre.ginfes.com.br/', { waitUntil: 'networkidle' });
 
-    // FUNÇÃO AUXILIAR 1: Fechar Modais
-    const fecharModalInformativo = async (timeoutMs = 1500) => {
+    // 🛠️ FUNÇÃO AUXILIAR 1: Varredura Agressiva de Popups
+    const varrerPopups = async () => {
       try {
-        const botaoOK = page.locator('.x-window-bwrap button:has-text("OK"), button:has-text("OK")').first();
-        if (await botaoOK.isVisible({ timeout: timeoutMs })) {
-          await botaoOK.click();
-          await page.waitForTimeout(600); 
+        const botoesOK = page.locator('button:has-text("OK"):visible');
+        const count = await botoesOK.count();
+        if (count > 0) {
+          await botoesOK.last().click({ force: true });
+          await page.waitForTimeout(800);
         }
       } catch (e) {}
+      // ESC quebra a maioria das máscaras de bloqueio do ExtJS
+      try { await page.keyboard.press('Escape'); } catch(e) {}
     };
 
-    // FUNÇÃO AUXILIAR 2: Clicar no botão "Próximo Passo" que estiver visível na tela
+    // 🛠️ FUNÇÃO AUXILIAR 2: Avançar Abas
     const clicarProximoPasso = async () => {
       const btnProx = page.locator('button:has-text("Próximo Passo"):visible').first();
       await btnProx.waitFor({ state: 'visible', timeout: 5000 });
-      await btnProx.click();
-      await page.waitForTimeout(1500); // Aguarda a próxima aba carregar
+      await btnProx.evaluate((node: HTMLButtonElement) => node.click());
+      await page.waitForTimeout(1500); 
     };
 
-    await fecharModalInformativo(2000); 
+    // --- LOGIN ---
+    await varrerPopups(); 
 
-    await page.click('img[alt="Acesso Exclusivo Prestador"]');
+    await page.click('img[alt="Acesso Exclusivo Prestador"]', { force: true });
     await page.locator('input[type="text"]:visible').first().fill(usuario);
     await page.locator('input[type="password"]:visible').first().fill(senhaReal);
     await page.locator('.x-btn:has-text("Entrar")').first().click();
 
-    await page.waitForTimeout(1000);
-    await fecharModalInformativo(1500);
+    // ⏱️ ESPERA ESTRATÉGICA: Dá 4 segundos para o servidor "cuspir" os popups antes de tentarmos agir
+    await page.waitForTimeout(4000); 
 
-    const btnEmitir = page.locator('div.gwt-PushButton:has(img[src*="icon_nfse3.gif"])').first();
-    await btnEmitir.waitFor({ state: 'visible' });
-    await btnEmitir.click();
-
-    await page.waitForTimeout(1500);
-    await fecharModalInformativo(1500);
-    await page.waitForTimeout(2000);
-
-    // --- PASSO 1: PESQUISA DO TOMADOR ---
+    // --- LOOP DE INSISTÊNCIA (Emitir -> Verificar Tomador) ---
     let inputCnpj = null;
     let btnPesquisar = null;
+    let telaTomadorAberta = false;
 
-    for (const frame of page.frames()) {
-      const painelPesquisa = frame.locator('fieldset').filter({ hasText: 'Pesquisa Tomador' });
-      if (await painelPesquisa.count() > 0) {
-        inputCnpj = painelPesquisa.locator('input[type="text"]:visible').first();
-        btnPesquisar = painelPesquisa.locator('button').filter({ hasText: 'Pesquisar' }).first();
-        break;
+    // Tenta 5 vezes furar o bloqueio da tela inicial
+    for (let tentativa = 1; tentativa <= 5; tentativa++) {
+      await varrerPopups(); // Limpa a tela antes de tentar
+      await page.waitForTimeout(1000);
+
+      try {
+        const imgEmitir = page.locator('img[src*="icon_nfse3.gif"]').first();
+        if (await imgEmitir.isVisible({ timeout: 2000 })) {
+          await imgEmitir.hover({ force: true });
+          await page.waitForTimeout(200);
+          await imgEmitir.click({ force: true }); 
+        }
+      } catch (e) {}
+
+      // Aguarda 3 segundos para o iframe de emissão carregar
+      await page.waitForTimeout(3000); 
+
+      // Varre todos os iframes procurando o título "Pesquisa Tomador"
+      for (const frame of page.frames()) {
+        const painelPesquisa = frame.locator('fieldset').filter({ hasText: 'Pesquisa Tomador' });
+        if (await painelPesquisa.count() > 0) {
+          inputCnpj = painelPesquisa.locator('input[type="text"]:visible').first();
+          btnPesquisar = painelPesquisa.locator('button').filter({ hasText: 'Pesquisar' }).first();
+          telaTomadorAberta = true;
+          break;
+        }
       }
+
+      if (telaTomadorAberta) break; // Sucesso! Sai do loop.
     }
 
-    if (inputCnpj && btnPesquisar) {
-      await inputCnpj.waitFor({ state: 'visible', timeout: 5000 });
-      await inputCnpj.click();
-      await page.waitForTimeout(300);
-      await inputCnpj.fill(clienteCnpj || '');
-      await page.waitForTimeout(1000); 
-      await btnPesquisar.click();
-      await page.waitForTimeout(3000); // Aguarda o carregamento do cliente
+    if (!telaTomadorAberta || !inputCnpj || !btnPesquisar) {
+      throw new Error("O portal Ginfes não respondeu ao clique de Emitir NFS-e (Travamento no servidor).");
     }
 
-    // Avança para a aba 2 (Serviços Prestados)
+    // --- PASSO 1: PREENCHIMENTO TOMADOR ---
+    await inputCnpj.waitFor({ state: 'visible', timeout: 5000 });
+    await inputCnpj.click({ force: true });
+    await page.waitForTimeout(300);
+    await inputCnpj.fill(clienteCnpj || '');
+    await page.waitForTimeout(1000); 
+    await btnPesquisar.evaluate((node: HTMLButtonElement) => node.click()); 
+    await page.waitForTimeout(3000); 
+
     await clicarProximoPasso();
 
-    // --- PASSO 2: PREENCHIMENTO DO SERVIÇO (Discriminação) ---
+    // --- PASSO 2: PREENCHIMENTO DO SERVIÇO ---
     try {
       const radioAtividade = page.locator('input.cbTextAlign:visible').first();
       if (await radioAtividade.isVisible()) {
-        await radioAtividade.click();
-        await page.locator('.x-combo-list-item:has-text("17.02")').first().click();
+        await radioAtividade.evaluate((node: HTMLElement) => node.click());
+        await page.locator('.x-combo-list-item:has-text("17.02")').first().evaluate((node: HTMLElement) => node.click());
         await page.waitForTimeout(500);
       }
     } catch (e) {}
@@ -228,27 +249,22 @@ ipcMain.handle('executar-robo-ginfes', async (_, credentials) => {
         const formItem = page.locator('.x-form-item').filter({ hasText: labelTexto });
         const inputCombo = formItem.locator('input.x-form-text').first();
         
-        await inputCombo.click(); 
-        await page.waitForTimeout(1000); 
+        await inputCombo.evaluate((node: HTMLElement) => node.click()); 
+        await page.waitForTimeout(800); 
         
         const listaAtiva = page.locator('.x-combo-list[style*="visibility: visible"]');
         const ultimaOpcao = listaAtiva.locator('.x-combo-list-item').last();
         
-        await ultimaOpcao.click();
-        await page.waitForTimeout(500);
-      } catch (e) {
-        console.error(`Falha ao preencher o combo: ${labelTexto}`);
-      }
+        await ultimaOpcao.evaluate((node: HTMLElement) => node.click());
+        await page.waitForTimeout(400);
+      } catch (e) {}
     };
 
     try {
       const inputAliquota = page.locator('.x-form-item').filter({ hasText: 'Aliquota (%)' }).locator('input.x-form-text:not([readonly])').first();
-      await inputAliquota.click();
+      await inputAliquota.evaluate((node: HTMLElement) => node.focus());
       await inputAliquota.fill('2');
-      await page.waitForTimeout(500);
-    } catch (e) {
-      console.error("Campo Alíquota não encontrado ou não editável.");
-    }
+    } catch (e) {}
 
     await selecionarUltimaOpcaoCombo('NBS');
     await selecionarUltimaOpcaoCombo('Código Indicador da Operação');
@@ -256,19 +272,33 @@ ipcMain.handle('executar-robo-ginfes', async (_, credentials) => {
     await selecionarUltimaOpcaoCombo('Classificacao Tributária');
 
     const textAreaDescricao = page.locator('textarea.x-form-textarea:visible').first();
-    await textAreaDescricao.click();
+    await textAreaDescricao.click({ force: true });
     await textAreaDescricao.fill(descricaoServico || '');
     await page.waitForTimeout(500);
 
-    // Avança para a aba 3 (Valores)
     await clicarProximoPasso();
 
     // --- PASSO 3: VALOR DA NOTA ---
+    await page.waitForTimeout(1500); 
+
+    const valorParaDigitar = String(valorNota).replace(/\./g, '');
+
     const vInput = page.locator('input.alinhaValores:visible').first();
-    await vInput.click({ clickCount: 3 }); 
-    await vInput.press('Backspace');
-    await vInput.fill(valorNota); 
-    await vInput.dispatchEvent('blur');
+    await vInput.waitFor({ state: 'visible' });
+
+    await vInput.evaluate((el: HTMLInputElement, val) => {
+        el.focus();
+        el.value = val;
+        el.dispatchEvent(new Event('keydown', { bubbles: true }));
+        el.dispatchEvent(new Event('keypress', { bubbles: true }));
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('keyup', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        el.blur(); 
+    }, valorParaDigitar);
+
+    await page.waitForTimeout(1500);
+    await varrerPopups();
 
     return "✅ Robô concluiu o preenchimento! Revise os dados e clique em 'Emitir'.";
   } catch (error: any) {
