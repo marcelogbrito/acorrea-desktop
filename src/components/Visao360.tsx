@@ -24,6 +24,10 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
   const [orcamentos, setOrcamentos] = useState<any[]>([])
   const [parceirosDisponiveis, setParceirosDisponiveis] = useState<any[]>([])
   
+  // Novos estados para Lembretes e OS
+  const [lembretes, setLembretes] = useState<any[]>([])
+  const [ordensServico, setOrdensServico] = useState<any[]>([])
+  
   const [abrirNovaCobranca, setAbrirNovaCobranca] = useState(false)
   const [receitaEditando, setReceitaEditando] = useState<any>(null) 
   const [abrirNovaVistoria, setAbrirNovaVistoria] = useState(false)
@@ -37,6 +41,13 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
   const [dadosCliente, setDadosCliente] = useState(cliente)
   const [abrirGeradorLaudos, setAbrirGeradorLaudos] = useState(false);
 
+  // Estados para Modais de CRUD (Lembretes e OS)
+  const [abrirModalLembrete, setAbrirModalLembrete] = useState(false);
+  const [lembreteForm, setLembreteForm] = useState({ id: '', titulo: '', descricao: '', data_lembrete: '', prioridade: 'media', concluido: false });
+
+  const [abrirModalOs, setAbrirModalOs] = useState(false);
+  const [osForm, setOsForm] = useState({ id: '', observacoes: '', data_hora_prevista: '', situacao: 'agendada' });
+
   useEffect(() => {
     loadClienteData()
     setDadosCliente(cliente)
@@ -45,25 +56,128 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
   async function loadClienteData() {
     setLoading(true)
     try {
-      const [resVist, resAvcb, resNF, resRec, resOrc, resParceiros] = await Promise.all([
+      const [resVist, resAvcb, resNF, resRec, resOrc, resParceiros, resLemb, resOs] = await Promise.all([
         supabase.from('vistoria_previa_avcb').select('*, checklist_vistoria_avcb(*)').eq('cliente_id', cliente.id).order('created_at', { ascending: false }),
         supabase.from('avcbs_expedidas').select('*').eq('cliente_id', cliente.id).order('validade', { ascending: false }).limit(1),
         supabase.from('notas_fiscais').select('*, servicos(nome_servico)').eq('cliente_id', cliente.id).order('data_emissao', { ascending: false }),
         supabase.from('receitas').select('*').eq('cliente_id', cliente.id).order('data_vencimento', { ascending: true }),
         supabase.from('orcamentos').select('*').eq('cliente_id', cliente.id).order('created_at', { ascending: false }),
-        supabase.from('clientes').select('id, nome').eq('parceiro', true)
+        supabase.from('clientes').select('id, nome').eq('parceiro', true),
+        // Buscas adicionadas
+        supabase.from('lembretes').select('*').eq('cliente_id', cliente.id).order('data_lembrete', { ascending: true }),
+        supabase.from('ordens_de_servico').select('*').eq('cliente_id', cliente.id).order('data_hora_prevista', { ascending: true })
       ])
+      
       setVistorias(resVist.data || [])
       setAvcbAtivo(resAvcb.data?.[0] || null)
       setNotasFiscais(resNF.data || [])
       setContasAReceber(resRec.data || [])
       setOrcamentos(resOrc.data || [])
       setParceirosDisponiveis(resParceiros.data || [])
+      setLembretes(resLemb.data || [])
+      setOrdensServico(resOs.data || [])
     } finally {
       setLoading(false)
     }
   }
 
+  // ================= CRUD LEMBRETES =================
+  const abrirFormLembrete = (lembrete?: any) => {
+    if (lembrete) {
+      setLembreteForm({
+        id: lembrete.id,
+        titulo: lembrete.titulo,
+        descricao: lembrete.descricao || '',
+        data_lembrete: lembrete.data_lembrete ? new Date(lembrete.data_lembrete).toISOString().slice(0, 16) : '',
+        prioridade: lembrete.prioridade || 'media',
+        concluido: lembrete.concluido
+      });
+    } else {
+      setLembreteForm({ id: '', titulo: '', descricao: '', data_lembrete: '', prioridade: 'media', concluido: false });
+    }
+    setAbrirModalLembrete(true);
+  }
+
+  const salvarLembrete = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        cliente_id: cliente.id,
+        titulo: lembreteForm.titulo,
+        descricao: lembreteForm.descricao,
+        data_lembrete: lembreteForm.data_lembrete || null,
+        prioridade: lembreteForm.prioridade,
+        concluido: lembreteForm.concluido
+      };
+
+      if (lembreteForm.id) {
+        await supabase.from('lembretes').update(payload).eq('id', lembreteForm.id);
+      } else {
+        await supabase.from('lembretes').insert([payload]);
+      }
+      setAbrirModalLembrete(false);
+      loadClienteData();
+    } catch (err: any) { alert("Erro ao salvar lembrete: " + err.message); }
+  }
+
+  const excluirLembrete = async (id: string) => {
+    if (!window.confirm("Deseja realmente excluir este lembrete?")) return;
+    await supabase.from('lembretes').delete().eq('id', id);
+    loadClienteData();
+  }
+
+  const concluirLembrete = async (id: string, concluido: boolean) => {
+    await supabase.from('lembretes').update({ concluido: !concluido }).eq('id', id);
+    loadClienteData();
+  }
+
+  // ================= CRUD ORDENS DE SERVIÇO =================
+  const abrirFormOs = (os?: any) => {
+    if (os) {
+      setOsForm({
+        id: os.id,
+        observacoes: os.observacoes || '',
+        data_hora_prevista: os.data_hora_prevista ? new Date(os.data_hora_prevista).toISOString().slice(0, 16) : '',
+        situacao: os.situacao || 'agendada'
+      });
+    } else {
+      setOsForm({ id: '', observacoes: '', data_hora_prevista: '', situacao: 'agendada' });
+    }
+    setAbrirModalOs(true);
+  }
+
+  const salvarOs = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        cliente_id: cliente.id,
+        observacoes: osForm.observacoes,
+        data_hora_prevista: osForm.data_hora_prevista || null,
+        situacao: osForm.situacao
+      };
+
+      if (osForm.id) {
+        await supabase.from('ordens_de_servico').update(payload).eq('id', osForm.id);
+      } else {
+        await supabase.from('ordens_de_servico').insert([payload]);
+      }
+      setAbrirModalOs(false);
+      loadClienteData();
+    } catch (err: any) { alert("Erro ao salvar OS: " + err.message); }
+  }
+
+  const excluirOs = async (id: string) => {
+    if (!window.confirm("Deseja realmente excluir esta O.S.?")) return;
+    await supabase.from('ordens_de_servico').delete().eq('id', id);
+    loadClienteData();
+  }
+
+  const alterarSituacaoOs = async (id: string, novaSituacao: string) => {
+    await supabase.from('ordens_de_servico').update({ situacao: novaSituacao }).eq('id', id);
+    loadClienteData();
+  }
+
+  // ================= MÉTODOS EXISTENTES =================
   const excluirOrcamento = async (id: string) => {
     if (!window.confirm("🗑️ Deseja realmente excluir esta proposta comercial permanentemente?")) return;
     try {
@@ -191,6 +305,12 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
     return `${dia}/${mes}/${ano}`;
   };
 
+  const formatarDateTime = (dataString: string) => {
+    if (!dataString) return '';
+    const d = new Date(dataString);
+    return `${d.toLocaleDateString()} às ${d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+  };
+
   if (loading) return <div style={{ padding: '20px' }}>Carregando dados...</div>
 
   if (vistoriaAbertaId) {
@@ -266,6 +386,38 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
               </div>
             </section>
 
+            {/* ------------ NOVA SEÇÃO: LEMBRETES ------------ */}
+            <section style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <h3 style={{ margin: 0 }}>🔔 Lembretes</h3>
+                <button onClick={() => abrirFormLembrete()} style={btnGreenStyle}>+ Lembrete</button>
+              </div>
+              {lembretes.length === 0 ? (
+                <p style={{ fontSize: '12px', color: '#999', textAlign: 'center' }}>Nenhum lembrete pendente.</p>
+              ) : (
+                lembretes.map(l => (
+                  <div key={l.id} style={{...itemStyle, opacity: l.concluido ? 0.5 : 1}}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={l.concluido} 
+                        onChange={() => concluirLembrete(l.id, l.concluido)} 
+                        style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
+                      />
+                      <div style={{ flex: 1, textDecoration: l.concluido ? 'line-through' : 'none' }}>
+                        <div style={{ fontWeight: 'bold', color: '#1a3353' }}>{l.titulo}</div>
+                        <div style={{ fontSize: '11px', color: '#666' }}>{formatarDateTime(l.data_lembrete)} | Prioridade: {l.prioridade}</div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '5px' }}>
+                        <button onClick={() => abrirFormLembrete(l)} style={btnSmallStyle}>✏️</button>
+                        <button onClick={() => excluirLembrete(l.id)} style={{...btnSmallStyle, color: '#dc3545'}}>🗑️</button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </section>
+
             <section style={cardStyle}>
               <div style={cardHeaderStyle}>
                 <h3 style={{ margin: 0 }}>💳 Contas a Receber</h3>
@@ -307,9 +459,47 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
                 )
               })}
             </section>
+
           </div>
 
           <div style={columnStyle}>
+            
+            {/* ------------ NOVA SEÇÃO: ORDENS DE SERVIÇO ------------ */}
+            <section style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <h3 style={{ margin: 0 }}>🛠️ Ordens de Serviço</h3>
+                <button onClick={() => abrirFormOs()} style={btnGreenStyle}>+ Nova O.S.</button>
+              </div>
+              {ordensServico.length === 0 ? (
+                <p style={{ fontSize: '12px', color: '#999', textAlign: 'center' }}>Nenhuma O.S. vinculada.</p>
+              ) : (
+                ordensServico.map(os => (
+                  <div key={os.id} style={itemStyle}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ flex: 1, paddingRight: '10px' }}>
+                        <span style={{ fontWeight: 'bold', color: '#1a3353', display: 'block' }}>{formatarDateTime(os.data_hora_prevista) || 'Data a definir'}</span>
+                        <span style={{ fontSize: '12px', color: '#555', display: 'block', margin: '4px 0' }}>{os.observacoes || 'Sem observações'}</span>
+                      </div>
+                      <select 
+                        value={os.situacao} 
+                        onChange={(e) => alterarSituacaoOs(os.id, e.target.value)}
+                        style={selectStatusStyle}
+                      >
+                        <option value="agendada">📅 Agendada</option>
+                        <option value="em_andamento">⚙️ Em Andamento</option>
+                        <option value="concluida">✅ Concluída</option>
+                        <option value="cancelada">🚫 Cancelada</option>
+                      </select>
+                    </div>
+                    <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end', gap: '5px' }}>
+                      <button onClick={() => abrirFormOs(os)} style={btnSmallStyle}>✏️ Editar</button>
+                      <button onClick={() => excluirOs(os.id)} style={{...btnSmallStyle, color: '#dc3545'}}>🗑️</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </section>
+
             <section style={cardStyle}>
               <div style={cardHeaderStyle}>
                 <h3 style={{ margin: 0 }}>📝 Propostas Comerciais</h3>
@@ -396,6 +586,7 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
         <GerenciamentoProjetos clienteId={cliente.id} clienteNome={cliente.nome} />
       )}
 
+      {/* ================= MODAIS DE CADASTRO GERAL ================= */}
       {abrirNovaCobranca && (
         <FormularioCobranca 
           clienteId={cliente.id} 
@@ -421,6 +612,78 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
       {abrirGeradorLaudos && (
         <ModalGeradorLaudos cliente={cliente} onClose={() => setAbrirGeradorLaudos(false)} />
       )}
+
+      {/* ================= MODAL DE LEMBRETE ================= */}
+      {abrirModalLembrete && (
+        <div style={modalOverlayStyle}>
+          <div style={modalContentStyle}>
+            <h3 style={{ marginTop: 0 }}>{lembreteForm.id ? 'Editar Lembrete' : 'Novo Lembrete'}</h3>
+            <form onSubmit={salvarLembrete} style={columnStyle}>
+              <div>
+                <label style={miniLabelStyle}>Título do Lembrete</label>
+                <input required style={inputEditableStyle} value={lembreteForm.titulo} onChange={e => setLembreteForm({...lembreteForm, titulo: e.target.value})} placeholder="Ex: Ligar para o Síndico" />
+              </div>
+              <div>
+                <label style={miniLabelStyle}>Descrição (Opcional)</label>
+                <textarea rows={3} style={inputEditableStyle} value={lembreteForm.descricao} onChange={e => setLembreteForm({...lembreteForm, descricao: e.target.value})} />
+              </div>
+              <div style={formGridStyle}>
+                <div>
+                  <label style={miniLabelStyle}>Data / Hora</label>
+                  <input type="datetime-local" required style={inputEditableStyle} value={lembreteForm.data_lembrete} onChange={e => setLembreteForm({...lembreteForm, data_lembrete: e.target.value})} />
+                </div>
+                <div>
+                  <label style={miniLabelStyle}>Prioridade</label>
+                  <select style={inputEditableStyle} value={lembreteForm.prioridade} onChange={e => setLembreteForm({...lembreteForm, prioridade: e.target.value})}>
+                    <option value="baixa">Baixa</option>
+                    <option value="media">Média</option>
+                    <option value="alta">Alta</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px' }}>
+                <button type="button" onClick={() => setAbrirModalLembrete(false)} style={btnBackStyle}>Cancelar</button>
+                <button type="submit" style={btnGreenStyle}>Salvar Lembrete</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL DE ORDEM DE SERVIÇO ================= */}
+      {abrirModalOs && (
+        <div style={modalOverlayStyle}>
+          <div style={modalContentStyle}>
+            <h3 style={{ marginTop: 0 }}>{osForm.id ? 'Editar O.S.' : 'Nova Ordem de Serviço'}</h3>
+            <form onSubmit={salvarOs} style={columnStyle}>
+              <div>
+                <label style={miniLabelStyle}>Descrição / Observações da O.S.</label>
+                <textarea required rows={4} style={inputEditableStyle} value={osForm.observacoes} onChange={e => setOsForm({...osForm, observacoes: e.target.value})} placeholder="Descreva os detalhes da ordem de serviço..." />
+              </div>
+              <div style={formGridStyle}>
+                <div>
+                  <label style={miniLabelStyle}>Data / Hora Prevista</label>
+                  <input type="datetime-local" required style={inputEditableStyle} value={osForm.data_hora_prevista} onChange={e => setOsForm({...osForm, data_hora_prevista: e.target.value})} />
+                </div>
+                <div>
+                  <label style={miniLabelStyle}>Situação</label>
+                  <select style={inputEditableStyle} value={osForm.situacao} onChange={e => setOsForm({...osForm, situacao: e.target.value})}>
+                    <option value="agendada">Agendada</option>
+                    <option value="em_andamento">Em Andamento</option>
+                    <option value="concluida">Concluída</option>
+                    <option value="cancelada">Cancelada</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px' }}>
+                <button type="button" onClick={() => setAbrirModalOs(false)} style={btnBackStyle}>Cancelar</button>
+                <button type="submit" style={btnGreenStyle}>Salvar O.S.</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
@@ -455,3 +718,7 @@ const miniLabelStyle = { fontSize: '11px', color: '#555', textTransform: 'upperc
 const inputStaticStyle = { width: '100%', padding: '5px 0', border: 'none', background: 'transparent', fontWeight: 'bold' as 'bold', color: '#333', fontSize: '14px' };
 const inputEditableStyle = { width: '100%', padding: '8px', border: '1px solid #007bff', borderRadius: '6px', background: '#fff', fontSize: '14px', boxSizing: 'border-box' as 'border-box' };
 const selectStatusStyle: React.CSSProperties = { padding: '4px', borderRadius: '4px', fontSize: '11px', border: '1px solid #ccc', backgroundColor: '#f8f9fa', cursor: 'pointer' };
+
+// Estilos dos Modais Internos
+const modalOverlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 };
+const modalContentStyle: React.CSSProperties = { backgroundColor: 'white', padding: '30px', borderRadius: '12px', width: '90%', maxWidth: '500px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' };
