@@ -1,4 +1,8 @@
 import React, { useState } from 'react';
+// Importações para geração WEB
+import PizZip from 'pizzip';
+import Docxtemplater from 'docxtemplater';
+
 
 interface ModalProps {
   cliente: any;
@@ -29,6 +33,49 @@ export function ModalGeradorLaudos({ cliente, onClose }: ModalProps) {
     setSelecionados(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  // Função dedicada para geração na Web
+  const gerarLaudoWeb = async (laudo: any, dadosTemplate: any, nomeAmigavel: string) => {
+    try {
+      // 1. Busca o arquivo template da pasta public
+      const response = await fetch(`/templates/${laudo.arquivo}`);
+      if (!response.ok) throw new Error(`Template ${laudo.arquivo} não encontrado na pasta public/templates.`);
+      
+      const arrayBuffer = await response.arrayBuffer();
+
+      // 2. Carrega o zip do documento Word
+      const zip = new PizZip(arrayBuffer);
+
+      // 3. Inicializa o docxtemplater
+      const doc = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
+      });
+
+      // 4. Aplica os dados (substitui as tags no Word)
+      doc.render(dadosTemplate);
+
+      // 5. Gera o blob final
+const blob = doc.getZip().generate({
+  type: 'blob',
+  mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+});
+
+// 6. Dispara o download com a mesma lógica nativa do ModalNovaProposta
+const url = URL.createObjectURL(blob);
+const link = document.createElement('a');
+link.href = url;
+link.download = `Atestado_${laudo.nome}_${nomeAmigavel}.docx`;
+document.body.appendChild(link);
+link.click();
+document.body.removeChild(link);
+URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error(`Erro ao gerar ${laudo.nome}:`, error);
+      throw error;
+    }
+  };
+
   const gerarLaudos = async () => {
     const laudosParaGerar = LISTA_LAUDOS.filter(l => selecionados[l.id]);
 
@@ -38,16 +85,43 @@ export function ModalGeradorLaudos({ cliente, onClose }: ModalProps) {
 
     setGerando(true);
     try {
-      const payload = {
-        cliente,
-        laudosSelecionados: laudosParaGerar,
-        nr_rrt: nrRrt
-      };
-
+      // Verifica se está no Desktop (Electron)
       // @ts-ignore
-      await window.acorreaAPI.gerarLaudosLote(payload);
+      const isDesktop = typeof window !== 'undefined' && window.acorreaAPI;
+
+      if (isDesktop) {
+        // MODO DESKTOP (Electron)
+        const payload = {
+          cliente,
+          laudosSelecionados: laudosParaGerar,
+          nr_rrt: nrRrt
+        };
+        // @ts-ignore
+        await window.acorreaAPI.gerarLaudosLote(payload);
+        alert(`✅ ${laudosParaGerar.length} Laudo(s) gerado(s) com sucesso na pasta Downloads do PC!`);
       
-      alert(`✅ ${laudosParaGerar.length} Laudo(s) gerado(s) com sucesso na pasta Downloads!`);
+      } else {
+        // MODO WEB (Browser)
+        const dataFormatada = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+        const nomeAmigavel = cliente.nome.replace(/[^a-z0-9]/gi, '_');
+
+        // Prepara os dados que vão substituir as chaves no Word
+        const dadosTemplate = {
+          nome_cliente: String(cliente.nome).toUpperCase(),
+          endereco_cliente: String(cliente.endereco).toUpperCase(),
+          endereço_cliente: String(cliente.endereco).toUpperCase(), // Para garantir se a tag tiver ç
+          data_extenso: dataFormatada,
+          nr_rrt: nrRrt || 'NÃO INFORMADO'
+        };
+
+        // Roda a geração para cada laudo selecionado
+        for (const laudo of laudosParaGerar) {
+          await gerarLaudoWeb(laudo, dadosTemplate, nomeAmigavel);
+        }
+        
+        alert(`✅ ${laudosParaGerar.length} Laudo(s) baixado(s) com sucesso!`);
+      }
+
       onClose();
     } catch (err: any) {
       alert("Erro ao gerar laudos: " + err.message);
