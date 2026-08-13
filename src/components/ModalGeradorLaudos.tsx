@@ -36,39 +36,33 @@ export function ModalGeradorLaudos({ cliente, onClose }: ModalProps) {
   // Função dedicada para geração na Web
   const gerarLaudoWeb = async (laudo: any, dadosTemplate: any, nomeAmigavel: string) => {
     try {
-      // 1. Busca o arquivo template da pasta public
       const response = await fetch(`/templates/${laudo.arquivo}`);
       if (!response.ok) throw new Error(`Template ${laudo.arquivo} não encontrado na pasta public/templates.`);
       
       const arrayBuffer = await response.arrayBuffer();
-
-      // 2. Carrega o zip do documento Word
       const zip = new PizZip(arrayBuffer);
-
-      // 3. Inicializa o docxtemplater
+      
       const doc = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,
       });
 
-      // 4. Aplica os dados (substitui as tags no Word)
       doc.render(dadosTemplate);
 
-      // 5. Gera o blob final
-const blob = doc.getZip().generate({
-  type: 'blob',
-  mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-});
+      const blob = doc.getZip().generate({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      });
 
-// 6. Dispara o download com a mesma lógica nativa do ModalNovaProposta
-const url = URL.createObjectURL(blob);
-const link = document.createElement('a');
-link.href = url;
-link.download = `Atestado_${laudo.nome}_${nomeAmigavel}.docx`;
-document.body.appendChild(link);
-link.click();
-document.body.removeChild(link);
-URL.revokeObjectURL(url);
+      // ✅ Usando a API nativa do navegador (igual ao ModalNovaProposta)
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Atestado_${laudo.nome}_${nomeAmigavel}.docx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
       
     } catch (error) {
       console.error(`Erro ao gerar ${laudo.nome}:`, error);
