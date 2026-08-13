@@ -5,7 +5,6 @@ interface DashboardProps {
   onSelecionarCliente: (clienteId: string) => void;
 }
 
-// Tipo para controlar o filtro ativo do painel
 type FiltroDashboard = 'todos' | 'orcamentos' | 'vistorias' | 'os' | 'lembretes';
 
 export function Dashboard({ onSelecionarCliente }: DashboardProps) {
@@ -49,7 +48,6 @@ export function Dashboard({ onSelecionarCliente }: DashboardProps) {
     fetchDashboardData()
   }, [])
 
-  // Função para concluir lembrete
   const concluirLembrete = async (id: string) => {
     try {
       const { error } = await supabase.from('lembretes').update({ concluido: true }).eq('id', id);
@@ -60,7 +58,17 @@ export function Dashboard({ onSelecionarCliente }: DashboardProps) {
     }
   };
 
-  // Lógica de cores para prazos (Hoje, Atrasado, Futuro)
+  // NOVA FUNÇÃO: Atualiza a situação da vistoria direto do Dashboard
+  const alterarSituacaoVistoria = async (id: string, novaSituacao: string) => {
+    try {
+      const { error } = await supabase.from('vistoria_previa_avcb').update({ situacao: novaSituacao }).eq('id', id);
+      if (error) throw error;
+      fetchDashboardData(); // Recarrega os dados (a vistoria sairá da lista se não for mais "agendada")
+    } catch (err: any) {
+      alert("Erro ao atualizar situação: " + err.message);
+    }
+  };
+
   const getBadgeStyle = (dataStr: string) => {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
@@ -68,11 +76,11 @@ export function Dashboard({ onSelecionarCliente }: DashboardProps) {
     dataAlvo.setHours(0, 0, 0, 0);
 
     if (dataAlvo.getTime() === hoje.getTime()) {
-      return { backgroundColor: '#d9534f', color: 'white', fontWeight: 'bold' }; // HOJE: Vermelho
+      return { backgroundColor: '#d9534f', color: 'white', fontWeight: 'bold' }; 
     } else if (dataAlvo.getTime() < hoje.getTime()) {
-      return { backgroundColor: '#f0ad4e', color: 'white' }; // ATRASADO: Laranja
+      return { backgroundColor: '#f0ad4e', color: 'white' }; 
     }
-    return { backgroundColor: '#e7f3ff', color: '#007bff' }; // FUTURO: Azul
+    return { backgroundColor: '#e7f3ff', color: '#007bff' }; 
   };
 
   if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}>🔄 Sincronizando Painel Operacional...</div>
@@ -87,7 +95,6 @@ export function Dashboard({ onSelecionarCliente }: DashboardProps) {
         )}
       </div>
 
-      {/* CARDS DE INDICADORES (CLICÁVEIS PARA FILTRAR) */}
       <div style={statsGrid}>
         <div onClick={() => setFiltroAtivo('orcamentos')} style={{ ...statCard, borderLeft: '5px solid #d9534f', cursor: 'pointer', opacity: filtroAtivo === 'orcamentos' || filtroAtivo === 'todos' ? 1 : 0.5 }}>
           <span style={labelStyle}>ORÇAMENTOS PENDENTES</span>
@@ -107,10 +114,7 @@ export function Dashboard({ onSelecionarCliente }: DashboardProps) {
         </div>
       </div>
 
-      {/* CORREÇÃO DO GRID AQUI */}
       <div style={mainColumnsGrid}>
-        
-        {/* COLUNA ESQUERDA: LEMBRETES E FINANCEIRO */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
           
           {(filtroAtivo === 'todos' || filtroAtivo === 'lembretes') && (
@@ -162,18 +166,41 @@ export function Dashboard({ onSelecionarCliente }: DashboardProps) {
           )}
         </div>
 
-        {/* COLUNA DIREITA: OPERACIONAL */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
           
+          {/* VISTORIAS ATUALIZADAS COM SELETOR DE STATUS */}
           {(filtroAtivo === 'todos' || filtroAtivo === 'vistorias') && (
             <section style={panelStyle}>
               <h4 style={panelTitle}>🕵️ Vistorias Agendadas</h4>
               {metricas.vistoriasAgendadas.map(v => {
                 const style = getBadgeStyle(v.data_agendamento);
                 return (
-                  <div key={v.id} style={listItem} onClick={() => onSelecionarCliente(v.cliente_id)}>
-                    <span style={clientNameLinkStyle}>{v.clientes?.nome}</span>
-                    <span style={{ ...badgeStyle, ...style }}>📅 {new Date(v.data_agendamento).toLocaleDateString()}</span>
+                  <div key={v.id} style={listItem} >
+                    {/* Isolamos o onClick para não conflitar com o Select */}
+                    <span 
+                      style={{...clientNameLinkStyle, cursor: 'pointer'}} 
+                      onClick={() => onSelecionarCliente(v.cliente_id)}
+                    >
+                      {v.clientes?.nome}
+                    </span>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span 
+                        style={{ ...badgeStyle, ...style, cursor: 'pointer' }} 
+                        onClick={() => onSelecionarCliente(v.cliente_id)}
+                      >
+                        📅 {new Date(v.data_agendamento).toLocaleDateString()}
+                      </span>
+                      <select 
+                        value={v.situacao || 'agendada'} 
+                        onChange={(e) => alterarSituacaoVistoria(v.id, e.target.value)}
+                        style={selectStatusStyle}
+                      >
+                        <option value="agendada">⏳ Agendada</option>
+                        <option value="realizada">✅ Realizada</option>
+                        <option value="cancelada">🚫 Cancelada</option>
+                      </select>
+                    </div>
                   </div>
                 );
               })}
@@ -200,21 +227,17 @@ export function Dashboard({ onSelecionarCliente }: DashboardProps) {
 
 // ESTILOS
 const headerStyle: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' };
-
-// CORRIGIDO: Agora os cards quebram a linha se a tela for menor que 200px
 const statsGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '15px' };
-
-// CORRIGIDO: Agora as duas colunas principais empilham-se no telemóvel (telas menores que 400px)
 const mainColumnsGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 400px), 1fr))', gap: '25px', marginTop: '25px' };
-
 const statCard: React.CSSProperties = { backgroundColor: 'white', padding: '15px 20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', transition: 'all 0.3s' };
 const labelStyle: React.CSSProperties = { fontSize: '10px', color: '#444', fontWeight: 'bold', letterSpacing: '0.5px' };
 const valueStyle: React.CSSProperties = { margin: '5px 0 0 0', fontSize: '22px', color: '#1a3353' };
 const panelStyle: React.CSSProperties = { backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 4px 10px rgba(0,0,0,0.08)' };
 const panelTitle: React.CSSProperties = { borderBottom: '2px solid #f0f2f5', paddingBottom: '12px', marginTop: 0, color: '#1a3353', fontSize: '17px' };
-const listItem: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 10px', borderBottom: '1px solid #f2f2f2', fontSize: '13px', cursor: 'pointer' };
+const listItem: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 10px', borderBottom: '1px solid #f2f2f2', fontSize: '13px' };
 const listItemLembrete: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', borderBottom: '1px solid #f2f2f2' };
 const clientNameLinkStyle: React.CSSProperties = { fontWeight: 500, color: '#007bff', flex: 1 };
 const btnConcluirStyle: React.CSSProperties = { backgroundColor: '#28a745', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' };
 const badgeStyle: React.CSSProperties = { backgroundColor: '#e7f3ff', color: '#007bff', padding: '4px 12px', borderRadius: '15px', fontSize: '10px', fontWeight: 'bold' };
 const btnLimparFiltro: React.CSSProperties = { padding: '5px 12px', borderRadius: '4px', border: '1px solid #d9534f', color: '#d9534f', background: 'white', cursor: 'pointer', fontSize: '12px' };
+const selectStatusStyle: React.CSSProperties = { padding: '4px', borderRadius: '4px', fontSize: '11px', border: '1px solid #ccc', backgroundColor: '#f8f9fa', cursor: 'pointer' };

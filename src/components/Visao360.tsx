@@ -298,6 +298,15 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
     loadClienteData();
   };
 
+  // ================= CRUD VISTORIAS (SITUAÇÃO) =================
+  const alterarSituacaoVistoria = async (id: string, novaSituacao: string) => {
+    try {
+      const { error } = await supabase.from('vistoria_previa_avcb').update({ situacao: novaSituacao }).eq('id', id);
+      if (error) throw error;
+      loadClienteData();
+    } catch (err: any) { alert("Erro ao atualizar situação: " + err.message); }
+  }
+
   const renderizarDataSegura = (dataString: string) => {
     if (!dataString) return '';
     const dataLimpa = dataString.split('T')[0];
@@ -538,16 +547,24 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
               )}
             </section>
 
-            <section style={cardStyle}>
+           <section style={cardStyle}>
               <div style={cardHeaderStyle}>
                 <h3 style={{ margin: 0 }}>🕵️ Vistorias Técnicas</h3>
                 <button onClick={() => setAbrirNovaVistoria(true)} style={btnGreenStyle}>+ Nova Vistoria</button>
               </div>
               {vistorias.map(v => (
                 <div key={v.id} style={itemVistoriaStyle}>
-                  <div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                     <div style={{ fontWeight: 'bold' }}>{renderizarDataSegura(v.data_agendamento)}</div>
-                    <div style={{ fontSize: '12px', color: v.situacao === 'concluida' ? 'green' : 'orange' }}>{v.situacao?.toUpperCase() || 'AGENDADA'}</div>
+                    <select 
+                      value={v.situacao || 'agendada'} 
+                      onChange={(e) => alterarSituacaoVistoria(v.id, e.target.value)}
+                      style={selectStatusStyle}
+                    >
+                      <option value="agendada">⏳ Agendada</option>
+                      <option value="realizada">✅ Realizada</option>
+                      <option value="cancelada">🚫 Cancelada</option>
+                    </select>
                   </div>
                   <button onClick={() => setVistoriaAbertaId(v.id)} style={btnOutlineStyle}>Checklist 📝</button>
                 </div>
