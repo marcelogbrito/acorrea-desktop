@@ -79,36 +79,32 @@ export function ModalGeradorLaudos({ cliente, onClose }: ModalProps) {
 
     setGerando(true);
     try {
-      // Verifica se está no Desktop (Electron)
-      // @ts-ignore
-      const isDesktop = typeof window !== 'undefined' && window.acorreaAPI;
+      // 🛠️ CORREÇÃO AQUI: Usando a sua lógica do ModalNovaProposta para garantir que não caia no Mock da Web
+      const isDesktop = navigator.userAgent.toLowerCase().includes('electron');
 
-      if (isDesktop) {
-        // MODO DESKTOP (Electron)
+      if (isDesktop && (window as any).acorreaAPI?.gerarLaudosLote) {
+        // --- MODO DESKTOP (Electron) ---
         const payload = {
           cliente,
           laudosSelecionados: laudosParaGerar,
           nr_rrt: nrRrt
         };
-        // @ts-ignore
-        await window.acorreaAPI.gerarLaudosLote(payload);
+        await (window as any).acorreaAPI.gerarLaudosLote(payload);
         alert(`✅ ${laudosParaGerar.length} Laudo(s) gerado(s) com sucesso na pasta Downloads do PC!`);
       
       } else {
-        // MODO WEB (Browser)
+        // --- MODO WEB (Browser) ---
         const dataFormatada = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
         const nomeAmigavel = cliente.nome.replace(/[^a-z0-9]/gi, '_');
 
-        // Prepara os dados que vão substituir as chaves no Word
         const dadosTemplate = {
           nome_cliente: String(cliente.nome).toUpperCase(),
           endereco_cliente: String(cliente.endereco).toUpperCase(),
-          endereço_cliente: String(cliente.endereco).toUpperCase(), // Para garantir se a tag tiver ç
+          endereço_cliente: String(cliente.endereco).toUpperCase(),
           data_extenso: dataFormatada,
           nr_rrt: nrRrt || 'NÃO INFORMADO'
         };
 
-        // Roda a geração para cada laudo selecionado
         for (const laudo of laudosParaGerar) {
           await gerarLaudoWeb(laudo, dadosTemplate, nomeAmigavel);
         }
