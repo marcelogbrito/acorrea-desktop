@@ -24,9 +24,12 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
   const [orcamentos, setOrcamentos] = useState<any[]>([])
   const [parceirosDisponiveis, setParceirosDisponiveis] = useState<any[]>([])
   
-  // Novos estados para Lembretes e OS
   const [lembretes, setLembretes] = useState<any[]>([])
   const [ordensServico, setOrdensServico] = useState<any[]>([])
+  const [profissionais, setProfissionais] = useState<any[]>([]) 
+  
+  const [filtroResponsavelId, setFiltroResponsavelId] = useState<string>('') 
+  const [filtroResponsavelOsId, setFiltroResponsavelOsId] = useState<string>('') // Novo Filtro OS
   
   const [abrirNovaCobranca, setAbrirNovaCobranca] = useState(false)
   const [receitaEditando, setReceitaEditando] = useState<any>(null) 
@@ -41,12 +44,17 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
   const [dadosCliente, setDadosCliente] = useState(cliente)
   const [abrirGeradorLaudos, setAbrirGeradorLaudos] = useState(false);
 
-  // Estados para Modais de CRUD (Lembretes e OS)
+  // Estados Lembrete
   const [abrirModalLembrete, setAbrirModalLembrete] = useState(false);
-  const [lembreteForm, setLembreteForm] = useState({ id: '', titulo: '', descricao: '', data_lembrete: '', prioridade: 'media', concluido: false });
-
+  const [lembreteForm, setLembreteForm] = useState({ id: '', titulo: '', descricao: '', data_lembrete: '', prioridade: 'media', concluido: false, responsaveis_ids: [] as string[] });
+  
+  // Estados O.S. (Atualizado com responsaveis_ids)
   const [abrirModalOs, setAbrirModalOs] = useState(false);
-  const [osForm, setOsForm] = useState({ id: '', observacoes: '', data_hora_prevista: '', situacao: 'agendada' });
+  const [osForm, setOsForm] = useState({ id: '', observacoes: '', data_hora_prevista: '', situacao: 'agendada', responsaveis_ids: [] as string[] });
+
+  // Estados para criar profissional inline
+  const [novoProfNome, setNovoProfNome] = useState('');
+  const [novoProfTipo, setNovoProfTipo] = useState('');
 
   useEffect(() => {
     loadClienteData()
@@ -56,16 +64,16 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
   async function loadClienteData() {
     setLoading(true)
     try {
-      const [resVist, resAvcb, resNF, resRec, resOrc, resParceiros, resLemb, resOs] = await Promise.all([
+      const [resVist, resAvcb, resNF, resRec, resOrc, resParceiros, resLemb, resOs, resProf] = await Promise.all([
         supabase.from('vistoria_previa_avcb').select('*, checklist_vistoria_avcb(*)').eq('cliente_id', cliente.id).order('created_at', { ascending: false }),
         supabase.from('avcbs_expedidas').select('*').eq('cliente_id', cliente.id).order('validade', { ascending: false }).limit(1),
         supabase.from('notas_fiscais').select('*, servicos(nome_servico)').eq('cliente_id', cliente.id).order('data_emissao', { ascending: false }),
         supabase.from('receitas').select('*').eq('cliente_id', cliente.id).order('data_vencimento', { ascending: true }),
         supabase.from('orcamentos').select('*').eq('cliente_id', cliente.id).order('created_at', { ascending: false }),
         supabase.from('clientes').select('id, nome').eq('parceiro', true),
-        // Buscas adicionadas
         supabase.from('lembretes').select('*').eq('cliente_id', cliente.id).order('data_lembrete', { ascending: true }),
-        supabase.from('ordens_de_servico').select('*').eq('cliente_id', cliente.id).order('data_hora_prevista', { ascending: true })
+        supabase.from('ordens_de_servico').select('*').eq('cliente_id', cliente.id).order('data_hora_prevista', { ascending: true }),
+        supabase.from('fornecedores_prestadores').select('id, nome_razao_social, tipo_fornecedor_prestador').not('tipo_fornecedor_prestador', 'is', null).order('nome_razao_social', { ascending: true })
       ])
       
       setVistorias(resVist.data || [])
@@ -76,6 +84,7 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
       setParceirosDisponiveis(resParceiros.data || [])
       setLembretes(resLemb.data || [])
       setOrdensServico(resOs.data || [])
+      setProfissionais(resProf.data || [])
     } finally {
       setLoading(false)
     }
@@ -85,16 +94,14 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
   const abrirFormLembrete = (lembrete?: any) => {
     if (lembrete) {
       setLembreteForm({
-        id: lembrete.id,
-        titulo: lembrete.titulo,
-        descricao: lembrete.descricao || '',
+        id: lembrete.id, titulo: lembrete.titulo, descricao: lembrete.descricao || '',
         data_lembrete: lembrete.data_lembrete ? new Date(lembrete.data_lembrete).toISOString().slice(0, 16) : '',
-        prioridade: lembrete.prioridade || 'media',
-        concluido: lembrete.concluido
+        prioridade: lembrete.prioridade || 'media', concluido: lembrete.concluido, responsaveis_ids: lembrete.responsaveis_ids || []
       });
     } else {
-      setLembreteForm({ id: '', titulo: '', descricao: '', data_lembrete: '', prioridade: 'media', concluido: false });
+      setLembreteForm({ id: '', titulo: '', descricao: '', data_lembrete: '', prioridade: 'media', concluido: false, responsaveis_ids: [] });
     }
+    setNovoProfNome(''); setNovoProfTipo('');
     setAbrirModalLembrete(true);
   }
 
@@ -102,19 +109,12 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
     e.preventDefault();
     try {
       const payload = {
-        cliente_id: cliente.id,
-        titulo: lembreteForm.titulo,
-        descricao: lembreteForm.descricao,
-        data_lembrete: lembreteForm.data_lembrete || null,
-        prioridade: lembreteForm.prioridade,
-        concluido: lembreteForm.concluido
+        cliente_id: cliente.id, titulo: lembreteForm.titulo, descricao: lembreteForm.descricao,
+        data_lembrete: lembreteForm.data_lembrete || null, prioridade: lembreteForm.prioridade,
+        concluido: lembreteForm.concluido, responsaveis_ids: lembreteForm.responsaveis_ids
       };
-
-      if (lembreteForm.id) {
-        await supabase.from('lembretes').update(payload).eq('id', lembreteForm.id);
-      } else {
-        await supabase.from('lembretes').insert([payload]);
-      }
+      if (lembreteForm.id) await supabase.from('lembretes').update(payload).eq('id', lembreteForm.id);
+      else await supabase.from('lembretes').insert([payload]);
       setAbrirModalLembrete(false);
       loadClienteData();
     } catch (err: any) { alert("Erro ao salvar lembrete: " + err.message); }
@@ -135,14 +135,14 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
   const abrirFormOs = (os?: any) => {
     if (os) {
       setOsForm({
-        id: os.id,
-        observacoes: os.observacoes || '',
+        id: os.id, observacoes: os.observacoes || '',
         data_hora_prevista: os.data_hora_prevista ? new Date(os.data_hora_prevista).toISOString().slice(0, 16) : '',
-        situacao: os.situacao || 'agendada'
+        situacao: os.situacao || 'agendada', responsaveis_ids: os.responsaveis_ids || []
       });
     } else {
-      setOsForm({ id: '', observacoes: '', data_hora_prevista: '', situacao: 'agendada' });
+      setOsForm({ id: '', observacoes: '', data_hora_prevista: '', situacao: 'agendada', responsaveis_ids: [] });
     }
+    setNovoProfNome(''); setNovoProfTipo('');
     setAbrirModalOs(true);
   }
 
@@ -150,17 +150,12 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
     e.preventDefault();
     try {
       const payload = {
-        cliente_id: cliente.id,
-        observacoes: osForm.observacoes,
-        data_hora_prevista: osForm.data_hora_prevista || null,
-        situacao: osForm.situacao
+        cliente_id: cliente.id, observacoes: osForm.observacoes,
+        data_hora_prevista: osForm.data_hora_prevista || null, situacao: osForm.situacao,
+        responsaveis_ids: osForm.responsaveis_ids
       };
-
-      if (osForm.id) {
-        await supabase.from('ordens_de_servico').update(payload).eq('id', osForm.id);
-      } else {
-        await supabase.from('ordens_de_servico').insert([payload]);
-      }
+      if (osForm.id) await supabase.from('ordens_de_servico').update(payload).eq('id', osForm.id);
+      else await supabase.from('ordens_de_servico').insert([payload]);
       setAbrirModalOs(false);
       loadClienteData();
     } catch (err: any) { alert("Erro ao salvar OS: " + err.message); }
@@ -177,7 +172,35 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
     loadClienteData();
   }
 
-  // ================= MÉTODOS EXISTENTES =================
+  // ================= TAGS / PROFISSIONAIS INLINE =================
+  const addTag = (profId: string, tipo: 'lembrete' | 'os') => {
+    if (!profId) return;
+    if (tipo === 'lembrete') setLembreteForm(prev => ({ ...prev, responsaveis_ids: [...prev.responsaveis_ids, profId] }));
+    else setOsForm(prev => ({ ...prev, responsaveis_ids: [...prev.responsaveis_ids, profId] }));
+  }
+
+  const removeTag = (profId: string, tipo: 'lembrete' | 'os') => {
+    if (tipo === 'lembrete') setLembreteForm(prev => ({ ...prev, responsaveis_ids: prev.responsaveis_ids.filter(id => id !== profId) }));
+    else setOsForm(prev => ({ ...prev, responsaveis_ids: prev.responsaveis_ids.filter(id => id !== profId) }));
+  }
+
+  const criarEAdicionarProfissional = async (tipo: 'lembrete' | 'os') => {
+    if (!novoProfNome.trim() || !novoProfTipo) return alert("Preencha o nome e o tipo do profissional.");
+    try {
+      const { data, error } = await supabase.from('fornecedores_prestadores').insert([
+        { nome_razao_social: novoProfNome.trim(), tipo_fornecedor_prestador: novoProfTipo }
+      ]).select().single();
+      
+      if (error) throw error;
+      setProfissionais(prev => [...prev, data].sort((a, b) => a.nome_razao_social.localeCompare(b.nome_razao_social)));
+      addTag(data.id, tipo);
+      setNovoProfNome(''); setNovoProfTipo('');
+    } catch (err: any) {
+      alert("Erro ao criar profissional: " + err.message);
+    }
+  }
+
+  // ================= MÉTODOS RESTANTES =================
   const excluirOrcamento = async (id: string) => {
     if (!window.confirm("🗑️ Deseja realmente excluir esta proposta comercial permanentemente?")) return;
     try {
@@ -187,10 +210,7 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
     } catch (err: any) { alert("Erro ao excluir: " + err.message); }
   }
 
-  const abrirEdicaoProposta = (orcamento: any) => {
-    setOrcamentoEditando(orcamento);
-    setAbrirNovaProposta(true);
-  }
+  const abrirEdicaoProposta = (orcamento: any) => { setOrcamentoEditando(orcamento); setAbrirNovaProposta(true); }
 
   const excluirReceita = async (id: string) => {
     if (!window.confirm("🗑️ Deseja realmente excluir esta cobrança?")) return;
@@ -212,12 +232,8 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
   const salvarDadosGerais = async () => {
     try {
       const { error } = await supabase.from('clientes').update({
-          nome: dadosCliente.nome,
-          cnpj_cpf: dadosCliente.cnpj_cpf,
-          endereco: dadosCliente.endereco,
-          telefone: dadosCliente.telefone,
-          email: dadosCliente.email,
-          parceiro_id: dadosCliente.parceiro_id || null
+          nome: dadosCliente.nome, cnpj_cpf: dadosCliente.cnpj_cpf, endereco: dadosCliente.endereco,
+          telefone: dadosCliente.telefone, email: dadosCliente.email, parceiro_id: dadosCliente.parceiro_id || null
         }).eq('id', cliente.id)
       if (error) throw error
       alert("✅ Dados do cliente updated!")
@@ -229,11 +245,7 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
   const dispararNFParaReceita = (receita: any) => {
     const confirmar = window.confirm(`Deseja iniciar a automação para a nota de R$ ${receita.valor_receber}?`);
     if (confirmar) {
-      onSolicitarEmissao(cliente, {
-        valor: Number(receita.valor_receber).toLocaleString('pt-BR'),
-        descricao: receita.discriminacao_servicos,
-        receitaId: receita.id
-      });
+      onSolicitarEmissao(cliente, { valor: Number(receita.valor_receber).toLocaleString('pt-BR'), descricao: receita.discriminacao_servicos, receitaId: receita.id });
     }
   }
 
@@ -268,37 +280,23 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
   }
 
   const alterarSituacaoOrcamento = async (id: string, novaSituacao: string) => {
-    const { error } = await supabase
-      .from('orcamentos')
-      .update({ situacao_orcamento: novaSituacao })
-      .eq('id', id);
-    
+    const { error } = await supabase.from('orcamentos').update({ situacao_orcamento: novaSituacao }).eq('id', id);
     if (error) return alert("Erro ao atualizar situação: " + error.message);
-
     if (novaSituacao === 'Aprovado') {
       const confirmar = window.confirm("Orçamento aprovado! Gerar lembrete de agendamento de vistoria?");
       if (confirmar) {
-        const amanha = new Date();
-        amanha.setDate(amanha.getDate() + 1);
-        amanha.setHours(9, 0, 0, 0); 
-
-        const { error: errorLembrete } = await supabase
-          .from('lembretes')
-          .insert({
-            cliente_id: cliente.id,
-            titulo: `📞 Ligar para agendar Vistoria: ${dadosCliente.nome}`,
+        const amanha = new Date(); amanha.setDate(amanha.getDate() + 1); amanha.setHours(9, 0, 0, 0); 
+        await supabase.from('lembretes').insert({
+            cliente_id: cliente.id, titulo: `📞 Ligar para agendar Vistoria: ${dadosCliente.nome}`,
             descricao: `Orçamento aprovado em ${new Date().toLocaleDateString()}. Necessário agendar vistoria prévia.`,
-            data_lembrete: amanha.toISOString(),
-            prioridade: 'alta'
-          });
-
-        if (!errorLembrete) alert("✅ Lembrete registrado no sistema!");
+            data_lembrete: amanha.toISOString(), prioridade: 'alta'
+        });
+        alert("✅ Lembrete registrado no sistema!");
       }
     }
     loadClienteData();
   };
 
-  // ================= CRUD VISTORIAS (SITUAÇÃO) =================
   const alterarSituacaoVistoria = async (id: string, novaSituacao: string) => {
     try {
       const { error } = await supabase.from('vistoria_previa_avcb').update({ situacao: novaSituacao }).eq('id', id);
@@ -319,6 +317,15 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
     const d = new Date(dataString);
     return `${d.toLocaleDateString()} às ${d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
   };
+
+  // Filtros aplicados
+  const lembretesFiltrados = lembretes.filter(l => 
+    filtroResponsavelId === '' || (l.responsaveis_ids && l.responsaveis_ids.includes(filtroResponsavelId))
+  );
+
+  const ordensFiltradas = ordensServico.filter(os => 
+    filtroResponsavelOsId === '' || (os.responsaveis_ids && os.responsaveis_ids.includes(filtroResponsavelOsId))
+  );
 
   if (loading) return <div style={{ padding: '20px' }}>Carregando dados...</div>
 
@@ -395,27 +402,47 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
               </div>
             </section>
 
-            {/* ------------ NOVA SEÇÃO: LEMBRETES ------------ */}
+            {/* ------------ SEÇÃO: LEMBRETES ------------ */}
             <section style={cardStyle}>
               <div style={cardHeaderStyle}>
                 <h3 style={{ margin: 0 }}>🔔 Lembretes</h3>
-                <button onClick={() => abrirFormLembrete()} style={btnGreenStyle}>+ Lembrete</button>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <select 
+                    style={selectStatusStyle} 
+                    value={filtroResponsavelId} 
+                    onChange={(e) => setFiltroResponsavelId(e.target.value)}
+                  >
+                    <option value="">Todos os Responsáveis</option>
+                    {profissionais.map(p => <option key={p.id} value={p.id}>{p.nome_razao_social}</option>)}
+                  </select>
+                  <button onClick={() => abrirFormLembrete()} style={btnGreenStyle}>+ Lembrete</button>
+                </div>
               </div>
-              {lembretes.length === 0 ? (
-                <p style={{ fontSize: '12px', color: '#999', textAlign: 'center' }}>Nenhum lembrete pendente.</p>
+              {lembretesFiltrados.length === 0 ? (
+                <p style={{ fontSize: '12px', color: '#999', textAlign: 'center' }}>Nenhum lembrete para este filtro.</p>
               ) : (
-                lembretes.map(l => (
+                lembretesFiltrados.map(l => (
                   <div key={l.id} style={{...itemStyle, opacity: l.concluido ? 0.5 : 1}}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                       <input 
                         type="checkbox" 
                         checked={l.concluido} 
                         onChange={() => concluirLembrete(l.id, l.concluido)} 
-                        style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
+                        style={{ transform: 'scale(1.2)', cursor: 'pointer', marginTop: '5px' }}
                       />
                       <div style={{ flex: 1, textDecoration: l.concluido ? 'line-through' : 'none' }}>
                         <div style={{ fontWeight: 'bold', color: '#1a3353' }}>{l.titulo}</div>
                         <div style={{ fontSize: '11px', color: '#666' }}>{formatarDateTime(l.data_lembrete)} | Prioridade: {l.prioridade}</div>
+                        
+                        {/* Exibição das Tags */}
+                        {l.responsaveis_ids && l.responsaveis_ids.length > 0 && (
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '6px' }}>
+                            {l.responsaveis_ids.map((id: string) => {
+                              const prof = profissionais.find(p => p.id === id);
+                              return prof ? <span key={id} style={tagVisualStyle}>{prof.nome_razao_social}</span> : null;
+                            })}
+                          </div>
+                        )}
                       </div>
                       <div style={{ display: 'flex', gap: '5px' }}>
                         <button onClick={() => abrirFormLembrete(l)} style={btnSmallStyle}>✏️</button>
@@ -473,21 +500,41 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
 
           <div style={columnStyle}>
             
-            {/* ------------ NOVA SEÇÃO: ORDENS DE SERVIÇO ------------ */}
+            {/* ------------ NOVA SEÇÃO: ORDENS DE SERVIÇO (COM TAGS) ------------ */}
             <section style={cardStyle}>
               <div style={cardHeaderStyle}>
                 <h3 style={{ margin: 0 }}>🛠️ Ordens de Serviço</h3>
-                <button onClick={() => abrirFormOs()} style={btnGreenStyle}>+ Nova O.S.</button>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <select 
+                    style={selectStatusStyle} 
+                    value={filtroResponsavelOsId} 
+                    onChange={(e) => setFiltroResponsavelOsId(e.target.value)}
+                  >
+                    <option value="">Todos os Responsáveis</option>
+                    {profissionais.map(p => <option key={p.id} value={p.id}>{p.nome_razao_social}</option>)}
+                  </select>
+                  <button onClick={() => abrirFormOs()} style={btnGreenStyle}>+ Nova O.S.</button>
+                </div>
               </div>
-              {ordensServico.length === 0 ? (
-                <p style={{ fontSize: '12px', color: '#999', textAlign: 'center' }}>Nenhuma O.S. vinculada.</p>
+              {ordensFiltradas.length === 0 ? (
+                <p style={{ fontSize: '12px', color: '#999', textAlign: 'center' }}>Nenhuma O.S. para este filtro.</p>
               ) : (
-                ordensServico.map(os => (
+                ordensFiltradas.map(os => (
                   <div key={os.id} style={itemStyle}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={{ flex: 1, paddingRight: '10px' }}>
                         <span style={{ fontWeight: 'bold', color: '#1a3353', display: 'block' }}>{formatarDateTime(os.data_hora_prevista) || 'Data a definir'}</span>
                         <span style={{ fontSize: '12px', color: '#555', display: 'block', margin: '4px 0' }}>{os.observacoes || 'Sem observações'}</span>
+                        
+                        {/* Exibição das Tags da O.S. */}
+                        {os.responsaveis_ids && os.responsaveis_ids.length > 0 && (
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '6px' }}>
+                            {os.responsaveis_ids.map((id: string) => {
+                              const prof = profissionais.find(p => p.id === id);
+                              return prof ? <span key={id} style={tagVisualStyle}>{prof.nome_razao_social}</span> : null;
+                            })}
+                          </div>
+                        )}
                       </div>
                       <select 
                         value={os.situacao} 
@@ -619,18 +666,14 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
         <ModalNovaProposta 
           cliente={cliente} 
           orcamentoEditando={orcamentoEditando} 
-          onClose={() => { 
-            setAbrirNovaProposta(false); 
-            setOrcamentoEditando(null); 
-            loadClienteData(); 
-          }} 
+          onClose={() => { setAbrirNovaProposta(false); setOrcamentoEditando(null); loadClienteData(); }} 
         />
       )}
       {abrirGeradorLaudos && (
         <ModalGeradorLaudos cliente={cliente} onClose={() => setAbrirGeradorLaudos(false)} />
       )}
 
-      {/* ================= MODAL DE LEMBRETE ================= */}
+      {/* ================= MODAL DE LEMBRETE (COM TAGS) ================= */}
       {abrirModalLembrete && (
         <div style={modalOverlayStyle}>
           <div style={modalContentStyle}>
@@ -642,8 +685,51 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
               </div>
               <div>
                 <label style={miniLabelStyle}>Descrição (Opcional)</label>
-                <textarea rows={3} style={inputEditableStyle} value={lembreteForm.descricao} onChange={e => setLembreteForm({...lembreteForm, descricao: e.target.value})} />
+                <textarea rows={2} style={inputEditableStyle} value={lembreteForm.descricao} onChange={e => setLembreteForm({...lembreteForm, descricao: e.target.value})} />
               </div>
+
+              {/* SEÇÃO DE RESPONSÁVEIS / TAGS */}
+              <div style={{ backgroundColor: '#f9f9f9', padding: '10px', borderRadius: '6px', border: '1px solid #ddd' }}>
+                <label style={miniLabelStyle}>Responsáveis (Tags)</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '10px' }}>
+                  {lembreteForm.responsaveis_ids.map(id => {
+                    const prof = profissionais.find(p => p.id === id);
+                    return prof ? (
+                      <span key={id} style={tagEditStyle}>
+                        {prof.nome_razao_social}
+                        <button type="button" onClick={() => removeTag(id, 'lembrete')} style={tagCloseBtn}>×</button>
+                      </span>
+                    ) : null;
+                  })}
+                  {lembreteForm.responsaveis_ids.length === 0 && <span style={{ fontSize: '11px', color: '#999' }}>Nenhum responsável vinculado.</span>}
+                </div>
+                <select 
+                  style={{ ...inputEditableStyle, marginBottom: '10px' }} 
+                  value="" 
+                  onChange={(e) => addTag(e.target.value, 'lembrete')}
+                >
+                  <option value="">+ Selecionar pessoa existente...</option>
+                  {profissionais.filter(p => !lembreteForm.responsaveis_ids.includes(p.id)).map(p => (
+                    <option key={p.id} value={p.id}>{p.nome_razao_social} ({p.tipo_fornecedor_prestador})</option>
+                  ))}
+                </select>
+                <div style={{ display: 'flex', gap: '5px', alignItems: 'center', borderTop: '1px dashed #ccc', paddingTop: '10px' }}>
+                  <input placeholder="Nome do novo..." style={{ ...inputEditableStyle, padding: '5px 8px' }} value={novoProfNome} onChange={e => setNovoProfNome(e.target.value)} />
+                  <select style={{ ...inputEditableStyle, padding: '5px 8px', width: 'auto' }} value={novoProfTipo} onChange={e => setNovoProfTipo(e.target.value)}>
+                    <option value="">Tipo...</option>
+                    <option value="fornecedor">Fornecedor</option>
+                    <option value="bombeiro">Bombeiro</option>
+                    <option value="engenheiro">Engenheiro</option>
+                    <option value="arquiteto">Arquiteto</option>
+                    <option value="prestador_adequacoes">Prestador Adeq.</option>
+                    <option value="consultor">Consultor</option>
+                    <option value="contador">Contador</option>
+                    <option value="assistente">Assistente</option>
+                  </select>
+                  <button type="button" onClick={() => criarEAdicionarProfissional('lembrete')} style={{ ...btnGreenStyle, padding: '6px', whiteSpace: 'nowrap' }}>Criar</button>
+                </div>
+              </div>
+
               <div style={formGridStyle}>
                 <div>
                   <label style={miniLabelStyle}>Data / Hora</label>
@@ -667,7 +753,7 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
         </div>
       )}
 
-      {/* ================= MODAL DE ORDEM DE SERVIÇO ================= */}
+      {/* ================= MODAL DE ORDEM DE SERVIÇO (COM TAGS) ================= */}
       {abrirModalOs && (
         <div style={modalOverlayStyle}>
           <div style={modalContentStyle}>
@@ -675,8 +761,51 @@ export function Visao360({ cliente, onBack, onSolicitarEmissao }: Visao360Props)
             <form onSubmit={salvarOs} style={columnStyle}>
               <div>
                 <label style={miniLabelStyle}>Descrição / Observações da O.S.</label>
-                <textarea required rows={4} style={inputEditableStyle} value={osForm.observacoes} onChange={e => setOsForm({...osForm, observacoes: e.target.value})} placeholder="Descreva os detalhes da ordem de serviço..." />
+                <textarea required rows={3} style={inputEditableStyle} value={osForm.observacoes} onChange={e => setOsForm({...osForm, observacoes: e.target.value})} placeholder="Descreva os detalhes da ordem de serviço..." />
               </div>
+
+              {/* SEÇÃO DE RESPONSÁVEIS / TAGS (Idêntica ao lembrete) */}
+              <div style={{ backgroundColor: '#f9f9f9', padding: '10px', borderRadius: '6px', border: '1px solid #ddd' }}>
+                <label style={miniLabelStyle}>Responsáveis (Tags)</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '10px' }}>
+                  {osForm.responsaveis_ids.map(id => {
+                    const prof = profissionais.find(p => p.id === id);
+                    return prof ? (
+                      <span key={id} style={tagEditStyle}>
+                        {prof.nome_razao_social}
+                        <button type="button" onClick={() => removeTag(id, 'os')} style={tagCloseBtn}>×</button>
+                      </span>
+                    ) : null;
+                  })}
+                  {osForm.responsaveis_ids.length === 0 && <span style={{ fontSize: '11px', color: '#999' }}>Nenhum responsável vinculado.</span>}
+                </div>
+                <select 
+                  style={{ ...inputEditableStyle, marginBottom: '10px' }} 
+                  value="" 
+                  onChange={(e) => addTag(e.target.value, 'os')}
+                >
+                  <option value="">+ Selecionar pessoa existente...</option>
+                  {profissionais.filter(p => !osForm.responsaveis_ids.includes(p.id)).map(p => (
+                    <option key={p.id} value={p.id}>{p.nome_razao_social} ({p.tipo_fornecedor_prestador})</option>
+                  ))}
+                </select>
+                <div style={{ display: 'flex', gap: '5px', alignItems: 'center', borderTop: '1px dashed #ccc', paddingTop: '10px' }}>
+                  <input placeholder="Nome do novo..." style={{ ...inputEditableStyle, padding: '5px 8px' }} value={novoProfNome} onChange={e => setNovoProfNome(e.target.value)} />
+                  <select style={{ ...inputEditableStyle, padding: '5px 8px', width: 'auto' }} value={novoProfTipo} onChange={e => setNovoProfTipo(e.target.value)}>
+                    <option value="">Tipo...</option>
+                    <option value="fornecedor">Fornecedor</option>
+                    <option value="bombeiro">Bombeiro</option>
+                    <option value="engenheiro">Engenheiro</option>
+                    <option value="arquiteto">Arquiteto</option>
+                    <option value="prestador_adequacoes">Prestador Adeq.</option>
+                    <option value="consultor">Consultor</option>
+                    <option value="contador">Contador</option>
+                    <option value="assistente">Assistente</option>
+                  </select>
+                  <button type="button" onClick={() => criarEAdicionarProfissional('os')} style={{ ...btnGreenStyle, padding: '6px', whiteSpace: 'nowrap' }}>Criar</button>
+                </div>
+              </div>
+
               <div style={formGridStyle}>
                 <div>
                   <label style={miniLabelStyle}>Data / Hora Prevista</label>
@@ -736,6 +865,9 @@ const inputStaticStyle = { width: '100%', padding: '5px 0', border: 'none', back
 const inputEditableStyle = { width: '100%', padding: '8px', border: '1px solid #007bff', borderRadius: '6px', background: '#fff', fontSize: '14px', boxSizing: 'border-box' as 'border-box' };
 const selectStatusStyle: React.CSSProperties = { padding: '4px', borderRadius: '4px', fontSize: '11px', border: '1px solid #ccc', backgroundColor: '#f8f9fa', cursor: 'pointer' };
 
-// Estilos dos Modais Internos
+// Estilos dos Modais e Tags
 const modalOverlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 };
 const modalContentStyle: React.CSSProperties = { backgroundColor: 'white', padding: '30px', borderRadius: '12px', width: '90%', maxWidth: '500px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' };
+const tagEditStyle: React.CSSProperties = { backgroundColor: '#e2e8f0', color: '#1a202c', padding: '4px 8px', borderRadius: '15px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '5px' };
+const tagCloseBtn: React.CSSProperties = { background: 'none', border: 'none', color: '#718096', cursor: 'pointer', padding: 0, fontSize: '14px', lineHeight: 1 };
+const tagVisualStyle: React.CSSProperties = { backgroundColor: '#e7f3ff', color: '#007bff', padding: '2px 8px', borderRadius: '10px', fontSize: '9px', fontWeight: 'bold' };

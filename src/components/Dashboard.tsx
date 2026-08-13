@@ -11,6 +11,11 @@ export function Dashboard({ onSelecionarCliente }: DashboardProps) {
   const [loading, setLoading] = useState(true)
   const [filtroAtivo, setFiltroAtivo] = useState<FiltroDashboard>('todos')
   const [lembretes, setLembretes] = useState<any[]>([])
+  const [profissionais, setProfissionais] = useState<any[]>([]) 
+  
+  const [filtroResponsavelId, setFiltroResponsavelId] = useState<string>('') 
+  const [filtroResponsavelOsId, setFiltroResponsavelOsId] = useState<string>('') // Filtro OS
+  
   const [metricas, setMetricas] = useState({
     receitasPendentes: [] as any[],
     despesasPendentes: [] as any[],
@@ -22,13 +27,14 @@ export function Dashboard({ onSelecionarCliente }: DashboardProps) {
   async function fetchDashboardData() {
     setLoading(true)
     try {
-      const [resRec, resDesp, resVist, resOrc, resOs, resLemb] = await Promise.all([
+      const [resRec, resDesp, resVist, resOrc, resOs, resLemb, resProf] = await Promise.all([
         supabase.from('receitas').select('*, clientes(nome)').eq('situacao', 'a_receber').order('data_vencimento', { ascending: true }),
         supabase.from('despesas').select('*, fornecedores_prestadores(nome_razao_social)').eq('situacao', 'a_pagar').order('data_vencimento', { ascending: true }),
         supabase.from('vistoria_previa_avcb').select('*, clientes(nome)').eq('situacao', 'agendada').order('data_agendamento', { ascending: true }),
         supabase.from('orcamentos').select('*, clientes(nome)').eq('situacao_orcamento', 'Aguardando'),
         supabase.from('ordens_de_servico').select('*, clientes(nome)').eq('situacao', 'agendada').order('data_hora_prevista', { ascending: true }),
-        supabase.from('lembretes').select('*, clientes(nome)').eq('concluido', false).order('data_lembrete', { ascending: true })
+        supabase.from('lembretes').select('*, clientes(nome)').eq('concluido', false).order('data_lembrete', { ascending: true }),
+        supabase.from('fornecedores_prestadores').select('id, nome_razao_social, tipo_fornecedor_prestador').not('tipo_fornecedor_prestador', 'is', null).order('nome_razao_social', { ascending: true })
       ])
 
       setMetricas({
@@ -39,6 +45,7 @@ export function Dashboard({ onSelecionarCliente }: DashboardProps) {
         osAgendadas: resOs.data || []
       })
       setLembretes(resLemb.data || [])
+      setProfissionais(resProf.data || [])
     } finally {
       setLoading(false)
     }
@@ -58,12 +65,11 @@ export function Dashboard({ onSelecionarCliente }: DashboardProps) {
     }
   };
 
-  // NOVA FUNÇÃO: Atualiza a situação da vistoria direto do Dashboard
   const alterarSituacaoVistoria = async (id: string, novaSituacao: string) => {
     try {
       const { error } = await supabase.from('vistoria_previa_avcb').update({ situacao: novaSituacao }).eq('id', id);
       if (error) throw error;
-      fetchDashboardData(); // Recarrega os dados (a vistoria sairá da lista se não for mais "agendada")
+      fetchDashboardData();
     } catch (err: any) {
       alert("Erro ao atualizar situação: " + err.message);
     }
@@ -82,6 +88,15 @@ export function Dashboard({ onSelecionarCliente }: DashboardProps) {
     }
     return { backgroundColor: '#e7f3ff', color: '#007bff' }; 
   };
+
+  // Filtros Globais Dashboard
+  const lembretesFiltrados = lembretes.filter(l => 
+    filtroResponsavelId === '' || (l.responsaveis_ids && l.responsaveis_ids.includes(filtroResponsavelId))
+  );
+
+  const osFiltradas = metricas.osAgendadas.filter(os => 
+    filtroResponsavelOsId === '' || (os.responsaveis_ids && os.responsaveis_ids.includes(filtroResponsavelOsId))
+  );
 
   if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}>🔄 Sincronizando Painel Operacional...</div>
 
@@ -119,16 +134,40 @@ export function Dashboard({ onSelecionarCliente }: DashboardProps) {
           
           {(filtroAtivo === 'todos' || filtroAtivo === 'lembretes') && (
             <section style={panelStyle}>
-              <h4 style={panelTitle}>🔔 Lembretes de Hoje</h4>
-              {lembretes.map(l => (
-                <div key={l.id} style={listItemLembrete}>
-                  <div style={{ flex: 1 }} onClick={() => onSelecionarCliente(l.cliente_id)}>
-                    <div style={{ fontWeight: 'bold', color: '#007bff', cursor: 'pointer' }}>{l.clientes?.nome}</div>
-                    <div style={{ fontSize: '13px' }}>{l.titulo}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f0f2f5', paddingBottom: '12px', marginBottom: '15px' }}>
+                <h4 style={{ margin: 0, color: '#1a3353', fontSize: '17px' }}>🔔 Lembretes de Hoje</h4>
+                <select 
+                  style={{ ...selectStatusStyle, padding: '6px' }} 
+                  value={filtroResponsavelId} 
+                  onChange={(e) => setFiltroResponsavelId(e.target.value)}
+                >
+                  <option value="">Todos os Responsáveis</option>
+                  {profissionais.map(p => <option key={p.id} value={p.id}>{p.nome_razao_social}</option>)}
+                </select>
+              </div>
+
+              {lembretesFiltrados.length === 0 ? (
+                <p style={{ fontSize: '12px', color: '#999', textAlign: 'center' }}>Nenhum lembrete para este filtro.</p>
+              ) : (
+                lembretesFiltrados.map(l => (
+                  <div key={l.id} style={listItemLembrete}>
+                    <div style={{ flex: 1 }} onClick={() => onSelecionarCliente(l.cliente_id)}>
+                      <div style={{ fontWeight: 'bold', color: '#007bff', cursor: 'pointer' }}>{l.clientes?.nome}</div>
+                      <div style={{ fontSize: '13px' }}>{l.titulo}</div>
+                      
+                      {l.responsaveis_ids && l.responsaveis_ids.length > 0 && (
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '6px' }}>
+                          {l.responsaveis_ids.map((id: string) => {
+                            const prof = profissionais.find(p => p.id === id);
+                            return prof ? <span key={id} style={tagVisualStyle}>{prof.nome_razao_social}</span> : null;
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <button onClick={() => concluirLembrete(l.id)} style={btnConcluirStyle}>Concluir ✓</button>
                   </div>
-                  <button onClick={() => concluirLembrete(l.id)} style={btnConcluirStyle}>Concluir ✓</button>
-                </div>
-              ))}
+                ))
+              )}
             </section>
           )}
 
@@ -147,28 +186,53 @@ export function Dashboard({ onSelecionarCliente }: DashboardProps) {
             </section>
           )}
 
+          {/* ------------ ORDENS DE SERVIÇO (COM TAGS E FILTRO) ------------ */}
           {(filtroAtivo === 'todos' || filtroAtivo === 'os') && (
             <section style={panelStyle}>
-              <h4 style={panelTitle}>🛠️ Ordens de Serviço</h4>
-              {metricas.osAgendadas.map(os => {
-                const style = getBadgeStyle(os.data_hora_prevista);
-                return (
-                  <div key={os.id} style={listItem} onClick={() => onSelecionarCliente(os.cliente_id)}>
-                    <div>
-                      <div style={clientNameLinkStyle}>{os.clientes?.nome}</div>
-                      <div style={{ fontSize: '11px', color: '#666' }}>{os.observacoes}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f0f2f5', paddingBottom: '12px', marginBottom: '15px' }}>
+                <h4 style={{ margin: 0, color: '#1a3353', fontSize: '17px' }}>🛠️ Ordens de Serviço</h4>
+                <select 
+                  style={{ ...selectStatusStyle, padding: '6px' }} 
+                  value={filtroResponsavelOsId} 
+                  onChange={(e) => setFiltroResponsavelOsId(e.target.value)}
+                >
+                  <option value="">Todos os Responsáveis</option>
+                  {profissionais.map(p => <option key={p.id} value={p.id}>{p.nome_razao_social}</option>)}
+                </select>
+              </div>
+              
+              {osFiltradas.length === 0 ? (
+                <p style={{ fontSize: '12px', color: '#999', textAlign: 'center' }}>Nenhuma O.S. para este filtro.</p>
+              ) : (
+                osFiltradas.map(os => {
+                  const style = getBadgeStyle(os.data_hora_prevista);
+                  return (
+                    <div key={os.id} style={listItem} onClick={() => onSelecionarCliente(os.cliente_id)}>
+                      <div>
+                        <div style={clientNameLinkStyle}>{os.clientes?.nome}</div>
+                        <div style={{ fontSize: '11px', color: '#666' }}>{os.observacoes}</div>
+                        
+                        {/* Exibição das Tags */}
+                        {os.responsaveis_ids && os.responsaveis_ids.length > 0 && (
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '6px' }}>
+                            {os.responsaveis_ids.map((id: string) => {
+                              const prof = profissionais.find(p => p.id === id);
+                              return prof ? <span key={id} style={tagVisualStyle}>{prof.nome_razao_social}</span> : null;
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      <span style={{ ...badgeStyle, ...style }}>{new Date(os.data_hora_prevista).toLocaleDateString()}</span>
                     </div>
-                    <span style={{ ...badgeStyle, ...style }}>{new Date(os.data_hora_prevista).toLocaleDateString()}</span>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </section>
           )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
           
-          {/* VISTORIAS ATUALIZADAS COM SELETOR DE STATUS */}
           {(filtroAtivo === 'todos' || filtroAtivo === 'vistorias') && (
             <section style={panelStyle}>
               <h4 style={panelTitle}>🕵️ Vistorias Agendadas</h4>
@@ -176,19 +240,12 @@ export function Dashboard({ onSelecionarCliente }: DashboardProps) {
                 const style = getBadgeStyle(v.data_agendamento);
                 return (
                   <div key={v.id} style={listItem} >
-                    {/* Isolamos o onClick para não conflitar com o Select */}
-                    <span 
-                      style={{...clientNameLinkStyle, cursor: 'pointer'}} 
-                      onClick={() => onSelecionarCliente(v.cliente_id)}
-                    >
+                    <span style={{...clientNameLinkStyle, cursor: 'pointer'}} onClick={() => onSelecionarCliente(v.cliente_id)}>
                       {v.clientes?.nome}
                     </span>
                     
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span 
-                        style={{ ...badgeStyle, ...style, cursor: 'pointer' }} 
-                        onClick={() => onSelecionarCliente(v.cliente_id)}
-                      >
+                      <span style={{ ...badgeStyle, ...style, cursor: 'pointer' }} onClick={() => onSelecionarCliente(v.cliente_id)}>
                         📅 {new Date(v.data_agendamento).toLocaleDateString()}
                       </span>
                       <select 
@@ -234,10 +291,11 @@ const labelStyle: React.CSSProperties = { fontSize: '10px', color: '#444', fontW
 const valueStyle: React.CSSProperties = { margin: '5px 0 0 0', fontSize: '22px', color: '#1a3353' };
 const panelStyle: React.CSSProperties = { backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 4px 10px rgba(0,0,0,0.08)' };
 const panelTitle: React.CSSProperties = { borderBottom: '2px solid #f0f2f5', paddingBottom: '12px', marginTop: 0, color: '#1a3353', fontSize: '17px' };
-const listItem: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 10px', borderBottom: '1px solid #f2f2f2', fontSize: '13px' };
+const listItem: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 10px', borderBottom: '1px solid #f2f2f2', fontSize: '13px', cursor: 'pointer' };
 const listItemLembrete: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', borderBottom: '1px solid #f2f2f2' };
 const clientNameLinkStyle: React.CSSProperties = { fontWeight: 500, color: '#007bff', flex: 1 };
 const btnConcluirStyle: React.CSSProperties = { backgroundColor: '#28a745', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' };
 const badgeStyle: React.CSSProperties = { backgroundColor: '#e7f3ff', color: '#007bff', padding: '4px 12px', borderRadius: '15px', fontSize: '10px', fontWeight: 'bold' };
 const btnLimparFiltro: React.CSSProperties = { padding: '5px 12px', borderRadius: '4px', border: '1px solid #d9534f', color: '#d9534f', background: 'white', cursor: 'pointer', fontSize: '12px' };
 const selectStatusStyle: React.CSSProperties = { padding: '4px', borderRadius: '4px', fontSize: '11px', border: '1px solid #ccc', backgroundColor: '#f8f9fa', cursor: 'pointer' };
+const tagVisualStyle: React.CSSProperties = { backgroundColor: '#e7f3ff', color: '#007bff', padding: '2px 8px', borderRadius: '10px', fontSize: '9px', fontWeight: 'bold' };
