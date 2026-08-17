@@ -1,4 +1,5 @@
 import imaps from 'imap-simple';
+import WebSocket from 'ws';
 import { simpleParser } from 'mailparser';
 import { createClient } from '@supabase/supabase-js';
 
@@ -22,7 +23,11 @@ export async function processarEmails(
   supabaseKey: string,
   onProgress?: (atual: number, total: number) => void
 ) {
-  const supabase = createClient(supabaseUrl, supabaseKey);
+  const supabase = createClient(supabaseUrl, supabaseKey, {
+  realtime: {
+    transport: WebSocket as any
+  }
+});
 
   const imapConfig = {
     imap: {

@@ -1,6 +1,7 @@
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import fs from 'fs';
+import WebSocket from 'ws';
 import { createClient } from '@supabase/supabase-js';
 
 // Funções Auxiliares de Formatação (Tolerantes a null/undefined)
@@ -36,7 +37,11 @@ export async function gerarRelatorioVistoriaPrevia(
   supabaseUrl: string,
   supabaseKey: string
 ) {
-  const supabase = createClient(supabaseUrl, supabaseKey);
+  const supabase = createClient(supabaseUrl, supabaseKey, {
+  realtime: {
+    transport: WebSocket as any
+  }
+});
 
   // 1. Busca Completa
   const { data: v, error } = await supabase

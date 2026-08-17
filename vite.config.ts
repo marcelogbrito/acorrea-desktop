@@ -9,6 +9,13 @@ const isWeb = process.env.VERCEL === '1' || process.env.BUILD_TARGET === 'web';
 export default defineConfig({
   base: isWeb ? '/' : './', 
   
+  // 👇 ADICIONE ESTE BLOCO AQUI PARA IGNORAR AS PASTAS DO WHATSAPP 👇
+  server: {
+    watch: {
+      ignored: ['**/.wwebjs_auth/**', '**/.wwebjs_cache/**']
+    }
+  },
+  
   plugins: [
     react(),
     

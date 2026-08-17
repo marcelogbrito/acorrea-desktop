@@ -6,6 +6,7 @@ import { chromium } from 'playwright-core';
 import { exec, execSync } from 'node:child_process';
 import fs from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
+import WebSocket from 'ws';
 import pkg from '../package.json';
 import { compareVersions } from 'compare-versions';
 import { machineIdSync } from 'node-machine-id';
@@ -27,7 +28,11 @@ const myDeviceId = machineIdSync();
 // Configuração Supabase
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SERVICE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
-const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
+  realtime: {
+    transport: WebSocket as any
+  }
+});
 
 let win: BrowserWindow | null = null;
 
@@ -349,7 +354,7 @@ ipcMain.handle('executar-pycad', async (_, payload) => {
       ? path.join(process.resourcesPath, 'automation', 'pycad_worker.py') 
       : path.join(__dirname, '..', 'automation', 'pycad_worker.py'); 
 
-    exec(`python "${scriptPath}" "${tempPath}"`, (error, stdout) => {
+    exec(`py "${scriptPath}" "${tempPath}"`, (error, stdout) => {
       if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
       if (error) reject(error);
       else resolve({ success: true, log: stdout });

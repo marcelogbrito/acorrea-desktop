@@ -1,3 +1,4 @@
+import WebSocket from 'ws';
 import { createClient } from '@supabase/supabase-js';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -16,7 +17,11 @@ if (!supabaseUrl || !supabaseServiceKey) {
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  realtime: {
+    transport: WebSocket as any
+  }
+});
 
 async function deploy() {
   const version = JSON.parse(fs.readFileSync('package.json', 'utf-8')).version;

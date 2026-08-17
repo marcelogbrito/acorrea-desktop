@@ -1,5 +1,6 @@
 import pkg from 'whatsapp-web.js';
 const { Client, LocalAuth } = pkg;
+import WebSocket from 'ws';
 import { createClient } from '@supabase/supabase-js';
 
 // Importamos os tipos separadamente apenas para a tipagem do código
@@ -11,7 +12,11 @@ import type { Message, Contact } from 'whatsapp-web.js';
 let wpClient: any; 
 
 export function iniciarWhatsApp(win: any, supabaseUrl: string, serviceKey: string) {
-  const supabase = createClient(supabaseUrl, serviceKey);
+  const supabase = createClient(supabaseUrl, serviceKey, {
+  realtime: {
+    transport: WebSocket as any
+  }
+});
 
   wpClient = new Client({
     authStrategy: new LocalAuth({
